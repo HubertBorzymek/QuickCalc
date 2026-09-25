@@ -19,8 +19,12 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
 - `QuickCalc.Core.Tests`: 32 zaliczone, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 2 zaliczone, 0 niezaliczonych, 1 pominięty;
-- łącznie: 34 przypadki, z czego 33 zaliczone i 1 pominięty.
+- `QuickCalc.Integration.Tests`: 5 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 38 przypadków, z czego 37 zaliczonych i 1 pominięty.
+
+Nowe testy integracyjne potwierdzają dostarczenie komunikatu `WM_HOTKEY` do okna komunikatów oraz zachowanie pierwszego skrótu po wymuszonym konflikcie rejestracji drugiego skrótu.
+
+Test konfliktów wykonany również bez uruchomionego QuickCalc wykazał błąd Win32 `1409` dla zwykłych klawiszy `F13` i `F15`. Oznacza to, że są wcześniej rejestrowane przez inny proces lub sterownik. Na życzenie użytkownika końcowa konfiguracja domyślna używa `F16` i `Ctrl+F16`. Skróty można zmieniać w czasie działania programu z okna diagnostycznego; nieudana rejestracja przywraca poprzednią konfigurację.
 
 Pominięty test otwiera rzeczywistą kontrolkę WinForms i wymaga przyznania fokusu pierwszoplanowego. Bieżąca sesja testowa nie udostępniła aplikacji natywnych warstwie automatyzacji i Windows nie przyznał fokusu oknu procesu testowego. Nie jest to raportowane jako pozytywna weryfikacja GUI.
 

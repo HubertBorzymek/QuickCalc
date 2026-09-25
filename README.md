@@ -18,11 +18,19 @@ W Visual Studio 2026:
 
 Domyślne skróty:
 
-- `F15` — kalkulator kontekstowy; wynik zastępuje zaznaczenie lub trafia w pozycję kursora.
-- `Ctrl+F15` — kalkulator schowka; wynik zostaje skopiowany, ale nie jest wklejany.
+- `F16` — kalkulator kontekstowy; wynik zastępuje zaznaczenie lub trafia w pozycję kursora.
+- `Ctrl+F16` — kalkulator schowka; wynik zostaje skopiowany, ale nie jest wklejany.
 - `Escape` — anulowanie bez zmiany tekstu i schowka.
 
 Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Nie rejestruje autostartu.
+
+### Diagnostyka skrótów
+
+Kliknij prawym przyciskiem ikonę QuickCalc w zasobniku i wybierz **Diagnostyka…**. Okno pokazuje osobny stan rejestracji obu skrótów, dokładny błąd Win32, numer sesji procesu oraz dziennik komunikatów `WM_HOTKEY`. Pola **Klawisz** i **Modyfikatory** pozwalają zmienić oba skróty bez restartu; przycisk **Zastosuj skróty** zapisuje konfigurację. Modyfikatory wpisuje się jako `None`, `Control`, `Shift`, `Alt`, `Win` lub połączenie, np. `Control+Shift`. Jeśli nowy skrót jest zajęty, poprzednia konfiguracja zostanie przywrócona.
+
+Przycisk **Otwórz test kalkulatora** uruchamia kalkulator schowka bez skrótu. W oknie można również sprawdzić kod klawisza rzeczywiście wysyłany przez programowalną klawiaturę i skopiować raport.
+
+Menu ikony zawiera również osobne polecenia otwierające oba tryby bez użycia skrótu.
 
 ## Wyrażenia i jednostki
 
@@ -56,7 +64,7 @@ Tryb kontekstowy nie korzysta ze schowka, więc nie musi zapisywać ani odtwarza
 
 1. Pracuj na kopii testowego projektu PCB.
 2. Otwórz kolejno pole X, Y, rozmiar pada i szerokość ścieżki.
-3. Zaznacz wyłącznie wartość z jednostką, naciśnij F15, wpisz `+5mil`, zatwierdź i sprawdź zmieniony fragment.
+3. Zaznacz wyłącznie wartość z jednostką, naciśnij F16, wpisz `+5mil`, zatwierdź i sprawdź zmieniony fragment.
 4. Powtórz dla `mm`, `mil`, braku zaznaczenia, anulowania Escape i obu poziomów uprawnień.
 5. Sprawdź format po zatwierdzeniu pola przez Altium oraz brak zmiany schowka w trybie kontekstowym.
 

@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace QuickCalc.Windows;
@@ -16,8 +17,22 @@ public sealed class GlobalHotkeyWindow : NativeWindow, IDisposable
     public void Register(int id, Keys key, HotkeyModifiers modifiers)
     {
         if (!NativeMethods.RegisterHotKey(Handle, id, (uint)(modifiers | HotkeyModifiers.NoRepeat), (uint)key))
-            throw new Win32Exception($"Nie można zarejestrować skrótu {modifiers}+{key}.");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), $"Nie można zarejestrować skrótu {Format(modifiers, key)}");
         _registered.Add(id);
+    }
+
+    public bool IsRegistered(int id) => _registered.Contains(id);
+
+    public void Unregister(int id)
+    {
+        if (!_registered.Remove(id)) return;
+        NativeMethods.UnregisterHotKey(Handle, id);
+    }
+
+    public static string Format(HotkeyModifiers modifiers, Keys key)
+    {
+        modifiers &= ~HotkeyModifiers.NoRepeat;
+        return modifiers == HotkeyModifiers.None ? key.ToString() : $"{modifiers}+{key}";
     }
 
     protected override void WndProc(ref Message m)
@@ -28,8 +43,7 @@ public sealed class GlobalHotkeyWindow : NativeWindow, IDisposable
 
     public void Dispose()
     {
-        foreach (var id in _registered) NativeMethods.UnregisterHotKey(Handle, id);
-        _registered.Clear();
+        foreach (var id in _registered.ToArray()) Unregister(id);
         DestroyHandle();
     }
 }

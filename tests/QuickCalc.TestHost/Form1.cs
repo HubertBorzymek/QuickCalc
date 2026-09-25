@@ -27,7 +27,7 @@ public sealed class Form1 : Form
         panel.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, 9, 3, 3) }, 0, row);
         var box = new TextBox { Text = text, Dock = DockStyle.Top, Margin = new Padding(3, 5, 3, 7) };
         panel.Controls.Add(box, 1, row);
-        box.Enter += (_, _) => BeginInvoke(() => initialize?.Invoke(box));
+        box.Enter += (_, _) => box.BeginInvoke(() => initialize?.Invoke(box));
         return box;
     }
 }
