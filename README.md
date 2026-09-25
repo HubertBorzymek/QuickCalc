@@ -18,8 +18,8 @@ W Visual Studio 2026:
 
 Domyślne skróty:
 
-- `F13` — kalkulator kontekstowy; wynik zastępuje zaznaczenie lub trafia w pozycję kursora.
-- `Ctrl+F13` — kalkulator schowka; wynik zostaje skopiowany, ale nie jest wklejany.
+- `F15` — kalkulator kontekstowy; wynik zastępuje zaznaczenie lub trafia w pozycję kursora.
+- `Ctrl+F15` — kalkulator schowka; wynik zostaje skopiowany, ale nie jest wklejany.
 - `Escape` — anulowanie bez zmiany tekstu i schowka.
 
 Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Nie rejestruje autostartu.
@@ -32,7 +32,7 @@ Wyrażenie zaczynające się od operatora jest względne względem prawidłowo z
 
 ## Zmiana skrótów
 
-Edytuj `hotkeys.json` obok pliku wykonywalnego (w źródłach: `src/QuickCalc.App/hotkeys.json`) i uruchom program ponownie. Nazwy klawiszy odpowiadają `System.Windows.Forms.Keys`, a modyfikatory to `Control`, `Alt`, `Shift`, `Win` albo `None`, łączone znakiem `+`. Do testów bez F13 można użyć np. `F12` oraz `Control+Alt`.
+Edytuj `hotkeys.json` obok pliku wykonywalnego (w źródłach: `src/QuickCalc.App/hotkeys.json`) i uruchom program ponownie. Nazwy klawiszy odpowiadają `System.Windows.Forms.Keys`, a modyfikatory to `Control`, `Alt`, `Shift`, `Win` albo `None`, łączone znakiem `+`.
 
 ## Budowanie, testy i publikacja
 
@@ -56,7 +56,7 @@ Tryb kontekstowy nie korzysta ze schowka, więc nie musi zapisywać ani odtwarza
 
 1. Pracuj na kopii testowego projektu PCB.
 2. Otwórz kolejno pole X, Y, rozmiar pada i szerokość ścieżki.
-3. Zaznacz wyłącznie wartość z jednostką, naciśnij F13, wpisz `+5mil`, zatwierdź i sprawdź zmieniony fragment.
+3. Zaznacz wyłącznie wartość z jednostką, naciśnij F15, wpisz `+5mil`, zatwierdź i sprawdź zmieniony fragment.
 4. Powtórz dla `mm`, `mil`, braku zaznaczenia, anulowania Escape i obu poziomów uprawnień.
 5. Sprawdź format po zatwierdzeniu pola przez Altium oraz brak zmiany schowka w trybie kontekstowym.
 

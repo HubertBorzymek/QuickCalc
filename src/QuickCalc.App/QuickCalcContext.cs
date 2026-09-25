@@ -20,7 +20,7 @@ internal sealed class QuickCalcContext : ApplicationContext
         menu.Items.Add("Wyczyść historię", null, (_, _) => _history.Clear());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Zakończ", null, (_, _) => ExitThread());
-        _tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "QuickCalc — F13: kontekst, Ctrl+F13: schowek", ContextMenuStrip = menu, Visible = true };
+        _tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "QuickCalc — F15: kontekst, Ctrl+F15: schowek", ContextMenuStrip = menu, Visible = true };
         _tray.DoubleClick += (_, _) => Open(CalculatorMode.Clipboard);
         try
         {
@@ -67,7 +67,7 @@ internal sealed class QuickCalcContext : ApplicationContext
 
 internal sealed record HotkeySettings(Keys ContextKey, HotkeyModifiers ContextModifiers, Keys ClipboardKey, HotkeyModifiers ClipboardModifiers)
 {
-    private sealed record JsonSettings(string ContextKey = "F13", string ContextModifiers = "None", string ClipboardKey = "F13", string ClipboardModifiers = "Control");
+    private sealed record JsonSettings(string ContextKey = "F15", string ContextModifiers = "None", string ClipboardKey = "F15", string ClipboardModifiers = "Control");
     public static HotkeySettings Load()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "hotkeys.json");
