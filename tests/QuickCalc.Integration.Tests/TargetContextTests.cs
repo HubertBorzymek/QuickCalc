@@ -68,6 +68,21 @@ public sealed class TargetContextTests
     }
 
     [TestMethod]
+    public void RelativeCalculationSupportsSelectedNumberWithoutUnitEndToEnd()
+    {
+        RunStaWithFocusedTextBox("Value: 23", 7, 2, (form, box) =>
+        {
+            var target = TargetContext.CaptureForHandles(form.Handle, box.Handle);
+            Assert.AreEqual("23", target.SelectedText);
+            var result = new ExpressionEvaluator().Evaluate("+3", target.SelectedText);
+            Assert.AreEqual("26", result.Text);
+            Assert.IsTrue(target.InsertOrReplace(result.Text));
+            Application.DoEvents();
+            Assert.AreEqual("Value: 26", box.Text);
+        });
+    }
+
+    [TestMethod]
     public void VerifiedSelectionWithoutWin32IndexesUsesUnicodeFallback()
     {
         RunStaWithFocusedTextBox("Value: 25mm", 7, 4, (form, box) =>

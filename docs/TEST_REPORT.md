@@ -18,13 +18,15 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
-- `QuickCalc.Core.Tests`: 32 zaliczone, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 8 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 41 przypadków, z czego 40 zaliczonych i 1 pominięty.
+- `QuickCalc.Core.Tests`: 35 zaliczonych, 0 niezaliczonych, 0 pominiętych;
+- `QuickCalc.Integration.Tests`: 9 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 45 przypadków, z czego 44 zaliczone i 1 pominięty.
 
 Nowe testy integracyjne potwierdzają dostarczenie komunikatu `WM_HOTKEY` do okna komunikatów oraz zachowanie pierwszego skrótu po wymuszonym konflikcie rejestracji drugiego skrótu.
 
 Testy integracyjne potwierdzają także rzeczywiste pokazanie popupu i podglądu `10+5 = 15`, wykrycie dokładnego zaznaczenia standardowej kontrolki oraz pełny przepływ względny: zaznaczone `25mm`, wyrażenie `+5`, wynik i zastąpienie tekstu `30mm`. Test awaryjnego `SendInput` dla kontrolki bez indeksów Win32 został pominięty, ponieważ runner testów nie dostał prawa do okna pierwszoplanowego; sama ścieżka jest wykonywana po skrócie użytkownika i wymaga końcowej kontroli w konkretnej przeglądarce.
+
+Po raporcie użytkownika naprawiono brak bibliotek UI Automation w publikacji, obsługę zaznaczonej liczby bez jednostki (`23` i `+3` daje `26`), interpretację wyniku Enter, przywracanie pierwszego planu oraz dźwięk systemowy Enter/Escape. Skrypt publikujący kopiuje wymagane biblioteki i uruchamia gotowy EXE z `--self-test`; publikacja jest odrzucana, jeżeli UI Automation lub względny parser nie załadują się z katalogu dystrybucyjnego.
 
 Test konfliktów wykonany również bez uruchomionego QuickCalc wykazał błąd Win32 `1409` dla zwykłych klawiszy `F13` i `F15`. Oznacza to, że są wcześniej rejestrowane przez inny proces lub sterownik. Na życzenie użytkownika końcowa konfiguracja domyślna używa `F16` i `Ctrl+F16`. Skróty można zmieniać w czasie działania programu z okna diagnostycznego; nieudana rejestracja przywraca poprzednią konfigurację.
 

@@ -162,7 +162,7 @@ public sealed class ExpressionEvaluator
                 if (left.Dimension != right.Dimension)
                 {
                     if (relative && selection is not null && left.Dimension == Dimension.Length && right.Dimension == Dimension.Scalar)
-                        right = Quantity.Length(right.BaseValue * Units.ToMillimetres(selection.Unit));
+                        right = Quantity.Length(right.BaseValue * Units.ToMillimetres(selection.Unit!));
                     else throw Error("Nie można dodawać wartości o różnych wymiarach");
                 }
                 return new Quantity(op == '+' ? left.BaseValue + right.BaseValue : left.BaseValue - right.BaseValue, left.Dimension);

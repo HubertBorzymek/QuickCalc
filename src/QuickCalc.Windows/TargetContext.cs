@@ -13,6 +13,7 @@ public sealed record TargetContext(
     string DetectionMethod)
 {
     public bool HasSelection => !string.IsNullOrEmpty(SelectedText);
+    public static string UiAutomationAssemblyIdentity => typeof(AutomationElement).Assembly.FullName ?? "UIAutomationClient";
 
     public static TargetContext Capture()
     {
@@ -63,11 +64,13 @@ public sealed record TargetContext(
         var attached = targetThread != currentThread && NativeMethods.AttachThreadInput(currentThread, targetThread, true);
         try
         {
-            if (!NativeMethods.SetForegroundWindow(WindowHandle)) return false;
+            NativeMethods.BringWindowToTop(WindowHandle);
+            NativeMethods.SetForegroundWindow(WindowHandle);
+            NativeMethods.SetActiveWindow(WindowHandle);
             NativeMethods.SetFocus(ControlHandle);
             if (SelectionStart is int start && SelectionEnd is int end)
                 NativeMethods.SendMessage(ControlHandle, NativeMethods.EmSetSel, (IntPtr)start, (IntPtr)end);
-            return true;
+            return NativeMethods.GetForegroundWindow() == WindowHandle;
         }
         finally { if (attached) NativeMethods.AttachThreadInput(currentThread, targetThread, false); }
     }

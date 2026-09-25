@@ -24,6 +24,8 @@ internal static class NativeMethods
     [DllImport("user32.dll")] internal static extern bool IsWindow(IntPtr hWnd);
     [DllImport("user32.dll")] internal static extern bool IsWindowEnabled(IntPtr hWnd);
     [DllImport("user32.dll")] internal static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] internal static extern bool BringWindowToTop(IntPtr hWnd);
+    [DllImport("user32.dll")] internal static extern IntPtr SetActiveWindow(IntPtr hWnd);
     [DllImport("user32.dll")] internal static extern IntPtr SetFocus(IntPtr hWnd);
     [DllImport("user32.dll")] internal static extern bool AttachThreadInput(uint attach, uint attachTo, bool value);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern int GetClassName(IntPtr hWnd, StringBuilder className, int maxCount);

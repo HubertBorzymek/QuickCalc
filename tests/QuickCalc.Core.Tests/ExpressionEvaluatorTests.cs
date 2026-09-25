@@ -29,6 +29,8 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("+5mil", "3mm", "3.127mm")]
     [DataRow("+1mm", "100mil", "139.370078740157mil")]
     [DataRow("+5", "3 mm", "8 mm")]
+    [DataRow("+3", "23", "26")]
+    [DataRow("*2", "12.5", "25")]
     public void EvaluatesRelativeExpressions(string expression, string selection, string expected)
         => Assert.AreEqual(expected, _sut.Evaluate(expression, selection).Text);
 
@@ -57,5 +59,13 @@ public sealed class ExpressionEvaluatorTests
     {
         Assert.IsTrue(ParsedSelection.TryParse(" 3 mm ", out var parsed));
         Assert.AreEqual("mm", parsed!.Unit); Assert.IsTrue(parsed.SpaceBeforeUnit);
+    }
+
+    [TestMethod]
+    public void ParsesSelectedNumberWithoutUnit()
+    {
+        Assert.IsTrue(ParsedSelection.TryParse("23", out var parsed));
+        Assert.IsNull(parsed!.Unit);
+        Assert.AreEqual(Dimension.Scalar, parsed.Value.Dimension);
     }
 }

@@ -1,15 +1,35 @@
 namespace QuickCalc.App;
 
+using QuickCalc.Core;
+using QuickCalc.Windows;
+using System.Reflection;
+using System.Runtime.Loader;
+
 static class Program
 {
     [STAThread]
-    static void Main()
+    static int Main(string[] args)
     {
+        ConfigureAssemblyResolution();
+        if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                _ = TargetContext.UiAutomationAssemblyIdentity;
+                if (new ExpressionEvaluator().Evaluate("+3", "23").Text != "26") return 3;
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                DiagnosticFileLogger.Write(ex, "Published self-test");
+                return 2;
+            }
+        }
         using var mutex = new Mutex(true, "QuickCalc.Singleton.2F858A03", out var firstInstance);
         if (!firstInstance)
         {
             MessageBox.Show("QuickCalc jest już uruchomiony.", "QuickCalc", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
+            return 1;
         }
         ApplicationConfiguration.Initialize();
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
@@ -24,5 +44,16 @@ static class Program
             if (e.ExceptionObject is Exception exception) DiagnosticFileLogger.Write(exception, "AppDomain.UnhandledException");
         };
         Application.Run(new QuickCalcContext());
+        return 0;
+    }
+
+    private static void ConfigureAssemblyResolution()
+    {
+        AssemblyLoadContext.Default.Resolving += (_, assemblyName) =>
+        {
+            if (assemblyName.Name is not ("UIAutomationClient" or "UIAutomationTypes")) return null;
+            var path = Path.Combine(AppContext.BaseDirectory, assemblyName.Name + ".dll");
+            return File.Exists(path) ? AssemblyLoadContext.Default.LoadFromAssemblyPath(path) : null;
+        };
     }
 }

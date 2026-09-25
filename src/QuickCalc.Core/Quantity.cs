@@ -10,21 +10,22 @@ public readonly record struct Quantity(double BaseValue, Dimension Dimension)
     public static Quantity Length(double millimetres) => new(millimetres, Dimension.Length);
 }
 
-public sealed record ParsedSelection(Quantity Value, string Unit, bool SpaceBeforeUnit)
+public sealed record ParsedSelection(Quantity Value, string? Unit, bool SpaceBeforeUnit)
 {
     public static bool TryParse(string? text, out ParsedSelection? selection)
     {
         selection = null;
         if (string.IsNullOrWhiteSpace(text)) return false;
         var match = System.Text.RegularExpressions.Regex.Match(text,
-            @"^\s*([+-]?(?:\d+(?:[\.,]\d*)?|[\.,]\d+))([ \t]*)(mm|mil|in|inch)\s*$",
+            @"^\s*([+-]?(?:\d+(?:[\.,]\d*)?|[\.,]\d+))([ \t]*)(mm|mil|in|inch)?\s*$",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         if (!match.Success) return false;
         if (!double.TryParse(match.Groups[1].Value.Replace(',', '.'), NumberStyles.Float,
                 CultureInfo.InvariantCulture, out var number) || !double.IsFinite(number)) return false;
-        var unit = Units.Normalize(match.Groups[3].Value);
-        selection = new ParsedSelection(Quantity.Length(number * Units.ToMillimetres(unit)), unit,
-            match.Groups[2].Value.Length > 0);
+        var hasUnit = match.Groups[3].Success;
+        var unit = hasUnit ? Units.Normalize(match.Groups[3].Value) : null;
+        var value = unit is null ? Quantity.Scalar(number) : Quantity.Length(number * Units.ToMillimetres(unit));
+        selection = new ParsedSelection(value, unit, hasUnit && match.Groups[2].Value.Length > 0);
         return true;
     }
 }

@@ -51,16 +51,29 @@ internal sealed class CalculatorPopup : Form
 
     private void ExpressionKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.KeyCode == Keys.Escape) { e.SuppressKeyPress = true; Finish(new(_mode, true)); return; }
-        if (e.KeyCode == Keys.Enter)
-        {
-            e.SuppressKeyPress = true;
-            try { var result = _evaluator.Evaluate(_expression.Text, _mode == CalculatorMode.Context ? _target.SelectedText : null); _history.Add(_expression.Text); Finish(new(_mode, false, result.Text)); }
-            catch (CalculationException ex) { ShowOperationError(ex.Message); }
-            return;
-        }
         if (e.KeyCode == Keys.Up && (_expression.TextLength == 0 || _historyNavigation)) { e.SuppressKeyPress = true; NavigateHistory(_history.Previous()); }
         else if (e.KeyCode == Keys.Down && _historyNavigation) { e.SuppressKeyPress = true; NavigateHistory(_history.Next()); }
+    }
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (keyData == Keys.Escape)
+        {
+            Finish(new(_mode, true));
+            return true;
+        }
+        if (keyData == Keys.Enter)
+        {
+            try
+            {
+                var result = _evaluator.Evaluate(_expression.Text, _mode == CalculatorMode.Context ? _target.SelectedText : null);
+                _history.Add(_expression.Text);
+                Finish(new(_mode, false, result.Text));
+            }
+            catch (CalculationException ex) { ShowOperationError(ex.Message); }
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
     }
 
     private void NavigateHistory(string? value)
