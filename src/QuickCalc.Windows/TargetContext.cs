@@ -21,11 +21,35 @@ public sealed record TargetContext(
         var info = new NativeMethods.GuiThreadInfo { cbSize = Marshal.SizeOf<NativeMethods.GuiThreadInfo>() };
         var control = NativeMethods.GetGUIThreadInfo(thread, ref info) && info.hwndFocus != IntPtr.Zero ? info.hwndFocus : window;
 
-        if (TryStandardEditSelection(control, out var start, out var end, out var text))
-            return new TargetContext(window, control, start, end, text, "Win32 EM_GETSEL");
-        if (TryAutomationSelection(control, out text))
-            return new TargetContext(window, control, null, null, text, "UI Automation TextPattern");
-        return new TargetContext(window, control, null, null, null, "brak wiarygodnej detekcji");
+        return CaptureForHandles(window, control);
+    }
+
+    public static TargetContext CaptureForHandles(IntPtr window, IntPtr control)
+    {
+        try
+        {
+            if (TryStandardEditSelection(control, out var start, out var end, out var text))
+                return new TargetContext(window, control, start, end, text, "Win32 EM_GETSEL");
+            if (TryAutomationSelection(control, out text))
+                return new TargetContext(window, control, null, null, text, "UI Automation TextPattern");
+            return new TargetContext(window, control, null, null, null, "brak wiarygodnej detekcji");
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            // Selection detection is optional. A hostile or broken UI Automation provider
+            // must never prevent the calculator itself from opening.
+            return new TargetContext(window, control, null, null, null,
+                $"tryb bezpieczny po błędzie {ex.GetType().Name}");
+        }
+    }
+
+    public static TargetContext CaptureBasic(string reason)
+    {
+        var window = NativeMethods.GetForegroundWindow();
+        var thread = NativeMethods.GetWindowThreadProcessId(window, out _);
+        var info = new NativeMethods.GuiThreadInfo { cbSize = Marshal.SizeOf<NativeMethods.GuiThreadInfo>() };
+        var control = NativeMethods.GetGUIThreadInfo(thread, ref info) && info.hwndFocus != IntPtr.Zero ? info.hwndFocus : window;
+        return new TargetContext(window, control, null, null, null, reason);
     }
 
     public bool IsValid => WindowHandle != IntPtr.Zero && ControlHandle != IntPtr.Zero &&
@@ -50,15 +74,16 @@ public sealed record TargetContext(
 
     public bool InsertOrReplace(string value)
     {
-        if (!RestoreFocus()) return false;
-        // TextPattern can prove that text was selected, but cannot restore or replace that
-        // range universally. Refuse instead of risking insertion into the wrong position.
-        if (HasSelection && !SelectionStart.HasValue) return false;
+        if (!IsValid) return false;
         if (SelectionStart.HasValue)
         {
+            NativeMethods.SendMessage(ControlHandle, NativeMethods.EmSetSel,
+                (IntPtr)SelectionStart.Value, (IntPtr)(SelectionEnd ?? SelectionStart.Value));
             NativeMethods.SendMessage(ControlHandle, NativeMethods.EmReplaceSel, (IntPtr)1, value);
+            RestoreFocus();
             return true;
         }
+        if (!RestoreFocus()) return false;
         return SendUnicode(value);
     }
 
@@ -83,17 +108,31 @@ public sealed record TargetContext(
         selected = null;
         try
         {
-            var element = AutomationElement.FromHandle(control);
-            if (!element.TryGetCurrentPattern(TextPattern.Pattern, out var pattern)) return false;
-            var ranges = ((TextPattern)pattern).GetSelection();
-            if (ranges.Length != 1) return false;
-            var value = ranges[0].GetText(-1);
-            if (!string.IsNullOrEmpty(value)) selected = value;
+            // Browser/Electron address bars and editors often share a top-level HWND.
+            // The globally focused UIA element identifies the actual editable child.
+            var element = AutomationElement.FocusedElement;
+            if (!TryGetTextSelection(element, out selected))
+            {
+                element = AutomationElement.FromHandle(control);
+                return TryGetTextSelection(element, out selected);
+            }
             return true;
         }
         catch (ElementNotAvailableException) { return false; }
         catch (InvalidOperationException) { return false; }
         catch (UnauthorizedAccessException) { return false; }
+        catch (COMException) { return false; }
+    }
+
+    private static bool TryGetTextSelection(AutomationElement? element, out string? selected)
+    {
+        selected = null;
+        if (element is null || !element.TryGetCurrentPattern(TextPattern.Pattern, out var pattern)) return false;
+        var ranges = ((TextPattern)pattern).GetSelection();
+        if (ranges.Length != 1) return false;
+        var value = ranges[0].GetText(-1);
+        if (!string.IsNullOrEmpty(value)) selected = value;
+        return true;
     }
 
     private static bool SendUnicode(string text)

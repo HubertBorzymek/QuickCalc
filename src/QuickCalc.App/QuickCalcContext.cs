@@ -31,10 +31,19 @@ internal sealed class QuickCalcContext : ApplicationContext
         _tray.DoubleClick += (_, _) => Open(CalculatorMode.Clipboard);
         _hotkeys.Pressed += (_, id) =>
         {
-            AddDiagnostic($"Odebrano WM_HOTKEY, identyfikator {id}.");
-            if (id == 1) Open(CalculatorMode.Context);
-            else if (id == 2) Open(CalculatorMode.Clipboard);
-            else AddDiagnostic($"Nieznany identyfikator skrótu: {id}.");
+            try
+            {
+                AddDiagnostic($"Odebrano WM_HOTKEY, identyfikator {id}.");
+                if (id == 1) Open(CalculatorMode.Context);
+                else if (id == 2) Open(CalculatorMode.Clipboard);
+                else AddDiagnostic($"Nieznany identyfikator skrótu: {id}.");
+            }
+            catch (Exception ex)
+            {
+                AddDiagnostic("Nieobsłużony błąd reakcji na skrót: " + ex);
+                DiagnosticFileLogger.Write(ex, "Obsługa WM_HOTKEY");
+                _tray.ShowBalloonTip(10000, "QuickCalc — błąd otwierania", "Szczegóły są dostępne w oknie Diagnostyka.", ToolTipIcon.Error);
+            }
         };
         try
         {
@@ -70,13 +79,46 @@ internal sealed class QuickCalcContext : ApplicationContext
 
     private void Open(CalculatorMode mode)
     {
-        if (_popup is { Visible: true }) { _popup.Activate(); return; }
-        var target = TargetContext.Capture();
+        AddDiagnostic($"Rozpoczynam otwieranie trybu {mode}.");
+        if (_popup is { Visible: true })
+        {
+            AddDiagnostic("Popup już istnieje — przenoszę go na bieżący ekran i aktywuję.");
+            _popup.MoveToCurrentCursorScreen(); _popup.BringToFront(); _popup.Activate(); return;
+        }
+
+        TargetContext target;
+        try
+        {
+            target = TargetContext.Capture();
+        }
+        catch (Exception ex)
+        {
+            AddDiagnostic("Pobranie kontekstu nie powiodło się; używam trybu bezpiecznego: " + ex);
+            DiagnosticFileLogger.Write(ex, "TargetContext.Capture");
+            try { target = TargetContext.CaptureBasic($"tryb bezpieczny po błędzie {ex.GetType().Name}"); }
+            catch (Exception fallbackException)
+            {
+                AddDiagnostic("Nie udało się nawet pobrać uchwytu okna; popup zostanie pokazany bez celu: " + fallbackException);
+                DiagnosticFileLogger.Write(fallbackException, "TargetContext.CaptureBasic");
+                target = new TargetContext(IntPtr.Zero, IntPtr.Zero, null, null, null, "tryb awaryjny bez celu");
+            }
+        }
         AddDiagnostic($"Otwarcie trybu {mode}; cel=0x{target.WindowHandle.ToInt64():X}, kontrolka=0x{target.ControlHandle.ToInt64():X}, metoda={target.DetectionMethod}, zaznaczenie={target.HasSelection}, poprawny={target.IsValid}.");
-        _popup = new CalculatorPopup(mode, target, _evaluator, _history);
-        _popup.OperationFinished += (_, operation) => Complete(target, operation);
-        _popup.FormClosed += (_, _) => _popup = null;
-        _popup.Show(); _popup.Activate();
+        try
+        {
+            _popup = new CalculatorPopup(mode, target, _evaluator, _history);
+            _popup.OperationFinished += (_, operation) => Complete(target, operation);
+            _popup.FormClosed += (_, _) => _popup = null;
+            _popup.Show(); _popup.MoveToCurrentCursorScreen(); _popup.BringToFront(); _popup.Activate();
+            AddDiagnostic($"Popup pokazany: uchwyt=0x{_popup.Handle.ToInt64():X}, Visible={_popup.Visible}, Bounds={_popup.Bounds}.");
+        }
+        catch (Exception ex)
+        {
+            AddDiagnostic("Nie udało się utworzyć lub pokazać popupu: " + ex);
+            DiagnosticFileLogger.Write(ex, "CalculatorPopup.Show");
+            _popup?.Dispose(); _popup = null;
+            throw;
+        }
     }
 
     private void Complete(TargetContext target, PopupOperation operation)

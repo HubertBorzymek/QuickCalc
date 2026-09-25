@@ -19,6 +19,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\QuickCalc.Core\QuickCalc.Core.csproj" />
     <ProjectReference Include="..\..\src\QuickCalc.Windows\QuickCalc.Windows.csproj" />
+    <ProjectReference Include="..\..\src\QuickCalc.App\QuickCalc.App.csproj" />
   </ItemGroup>
 
 </Project>

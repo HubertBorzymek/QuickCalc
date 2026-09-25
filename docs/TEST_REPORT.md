@@ -19,10 +19,12 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
 - `QuickCalc.Core.Tests`: 32 zaliczone, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 5 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 38 przypadków, z czego 37 zaliczonych i 1 pominięty.
+- `QuickCalc.Integration.Tests`: 8 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 41 przypadków, z czego 40 zaliczonych i 1 pominięty.
 
 Nowe testy integracyjne potwierdzają dostarczenie komunikatu `WM_HOTKEY` do okna komunikatów oraz zachowanie pierwszego skrótu po wymuszonym konflikcie rejestracji drugiego skrótu.
+
+Testy integracyjne potwierdzają także rzeczywiste pokazanie popupu i podglądu `10+5 = 15`, wykrycie dokładnego zaznaczenia standardowej kontrolki oraz pełny przepływ względny: zaznaczone `25mm`, wyrażenie `+5`, wynik i zastąpienie tekstu `30mm`. Test awaryjnego `SendInput` dla kontrolki bez indeksów Win32 został pominięty, ponieważ runner testów nie dostał prawa do okna pierwszoplanowego; sama ścieżka jest wykonywana po skrócie użytkownika i wymaga końcowej kontroli w konkretnej przeglądarce.
 
 Test konfliktów wykonany również bez uruchomionego QuickCalc wykazał błąd Win32 `1409` dla zwykłych klawiszy `F13` i `F15`. Oznacza to, że są wcześniej rejestrowane przez inny proces lub sterownik. Na życzenie użytkownika końcowa konfiguracja domyślna używa `F16` i `Ctrl+F16`. Skróty można zmieniać w czasie działania programu z okna diagnostycznego; nieudana rejestracja przywraca poprzednią konfigurację.
 

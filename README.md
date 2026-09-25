@@ -58,6 +58,8 @@ Publikacja samowystarczalna dla Windows x64 trafia do `artifacts/publish`. Nie j
 
 Standardowe kontrolki Edit/RichEdit są obsługiwane bezpośrednio przez `EM_GETSEL`, `EM_SETSEL` i `EM_REPLACESEL`. Dla innych kontrolek UI Automation TextPattern służy do potwierdzenia faktycznego zaznaczenia. Jeśli zaznaczenia nie da się wiarygodnie odczytać, działania względne są wyłączone; absolutne wstawienie nadal może użyć wejścia Unicode po sprawdzeniu istnienia pierwotnego okna.
 
+W przeglądarkach i aplikacjach Electron zaznaczenie jest pobierane z aktualnie aktywnego elementu UI Automation, a wynik zastępuje zachowane zaznaczenie przez wejście Unicode po przywróceniu poprzedniego okna. Błąd dostawcy UI Automation nie blokuje już otwarcia kalkulatora — popup przechodzi wtedy do trybu bezpiecznego bez zaznaczenia. Nieobsłużone wyjątki interfejsu są zapisywane w `quickcalc-error.log` obok programu.
+
 Tryb kontekstowy nie korzysta ze schowka, więc nie musi zapisywać ani odtwarzać cudzych formatów. Tryb schowka celowo zastępuje jego zawartość. Aplikacja uruchomiona bez podniesionych uprawnień nie może niezawodnie sterować oknem uruchomionym jako administrator. Kontrolki niestandardowe mogą nie zachować zaznaczenia po utracie fokusu; program odmawia działania względnego, jeżeli zaznaczenie nie zostało potwierdzone, ale zgodność wstawiania wymaga testu z konkretną aplikacją.
 
 ## Ręczny test Altium Designer 18
