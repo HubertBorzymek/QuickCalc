@@ -1,0 +1,8 @@
+[
+  {
+    "Name": "QuickCalc",
+    "Projects": [
+      { "Path": "src\\QuickCalc.App\\QuickCalc.App.csproj", "Action": "Start" }
+    ]
+  }
+]
