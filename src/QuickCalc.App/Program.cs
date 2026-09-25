@@ -2,15 +2,12 @@ namespace QuickCalc.App;
 
 using QuickCalc.Core;
 using QuickCalc.Windows;
-using System.Reflection;
-using System.Runtime.Loader;
 
 static class Program
 {
     [STAThread]
     static int Main(string[] args)
     {
-        ConfigureAssemblyResolution();
         if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
         {
             try
@@ -47,13 +44,4 @@ static class Program
         return 0;
     }
 
-    private static void ConfigureAssemblyResolution()
-    {
-        AssemblyLoadContext.Default.Resolving += (_, assemblyName) =>
-        {
-            if (assemblyName.Name is not ("UIAutomationClient" or "UIAutomationTypes")) return null;
-            var path = Path.Combine(AppContext.BaseDirectory, assemblyName.Name + ".dll");
-            return File.Exists(path) ? AssemblyLoadContext.Default.LoadFromAssemblyPath(path) : null;
-        };
-    }
 }

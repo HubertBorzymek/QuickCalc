@@ -23,6 +23,15 @@ public sealed class TargetContextTests
     }
 
     [TestMethod]
+    public void UiAutomationUsesNet9AssemblyAndDoesNotFallBackAfterLoadFailure()
+    {
+        StringAssert.Contains(TargetContext.UiAutomationAssemblyIdentity, "Version=9.0.0.0");
+        var target = TargetContext.CaptureForHandles(IntPtr.Zero, IntPtr.Zero);
+        Assert.IsFalse(target.DetectionMethod.Contains("FileNotFoundException", StringComparison.Ordinal));
+        Assert.IsFalse(target.DetectionMethod.Contains("TypeLoadException", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void StandardEditSelectionCanBeCapturedAndReplaced()
     {
         Exception? failure = null;
