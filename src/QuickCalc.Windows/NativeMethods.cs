@@ -11,6 +11,7 @@ internal static class NativeMethods
     internal const int EmReplaceSel = 0x00C2;
     internal const int WmGetText = 0x000D;
     internal const int WmGetTextLength = 0x000E;
+    internal const int WmCopy = 0x0301;
     internal const uint KeyeventfUnicode = 0x0004;
     internal const uint KeyeventfKeyup = 0x0002;
     internal const uint SmtoAbortIfHung = 0x0002;

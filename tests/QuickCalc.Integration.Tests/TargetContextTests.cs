@@ -66,6 +66,22 @@ public sealed class TargetContextTests
     }
 
     [TestMethod]
+    public void WindowMessageCopyReadsOnlyAnActualSelection()
+    {
+        RunStaWithFocusedTextBox("Value: 25mm", 7, 4, (form, box) =>
+        {
+            Assert.IsTrue(TargetContext.TryReadSelectionByWindowMessage(box.Handle, out var selected));
+            Assert.AreEqual("25mm", selected);
+            box.Select(7, 0);
+            var timer = Stopwatch.StartNew();
+            Assert.IsFalse(TargetContext.TryReadSelectionByWindowMessage(box.Handle, out _));
+            timer.Stop();
+            Assert.IsTrue(timer.Elapsed < TimeSpan.FromMilliseconds(100),
+                $"WM_COPY bez zaznaczenia trwał {timer.Elapsed.TotalMilliseconds:F0} ms.");
+        });
+    }
+
+    [TestMethod]
     public void StandardEditSelectionCanBeCapturedAndReplaced()
     {
         Exception? failure = null;

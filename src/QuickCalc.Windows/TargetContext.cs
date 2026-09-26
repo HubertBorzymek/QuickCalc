@@ -70,6 +70,16 @@ public sealed class TargetContext
         var control = NativeMethods.GetGUIThreadInfo(thread, ref info) && info.hwndFocus != IntPtr.Zero ? info.hwndFocus : window;
 
         var captured = CaptureForHandles(window, control);
+        if (captured.HasSelection) return captured;
+
+        // WM_COPY talks directly to the focused control instead of invoking an
+        // application command. It covers native/custom CAD fields without causing
+        // Visual Studio's blocking "editor command" dialog when nothing is selected.
+        if (TryReadSelectionByWindowMessage(control, out var messageSelection))
+            return new TargetContext(window, control, null, null, messageSelection,
+                "WM_COPY aktywnej kontrolki", captured._automationTarget, null, true,
+                captured.TargetBounds);
+
         // Never invoke an editor command merely because UIA returned no text.
         // Visual Studio can serialize Ctrl+C behind a busy editor operation and
         // display a long "wait for an editor command" dialog. Use the clipboard
@@ -387,6 +397,21 @@ public sealed class TargetContext
     }
 
     private static bool TryReadSelectionByCopy(out string selected)
+        => TryReadSelectionFromClipboardAction(
+            () => SendChord(NativeMethods.VkControl, NativeMethods.VkC), 4, 5, out selected);
+
+    internal static bool TryReadSelectionByWindowMessage(IntPtr control, out string selected)
+        => TryReadSelectionFromClipboardAction(
+            () => control != IntPtr.Zero &&
+                  NativeMethods.SendMessageTimeout(control, NativeMethods.WmCopy, IntPtr.Zero, IntPtr.Zero,
+                      NativeMethods.SmtoAbortIfHung, 10, out _) != IntPtr.Zero,
+            3, 3, out selected);
+
+    private static bool TryReadSelectionFromClipboardAction(
+        Func<bool> copyAction,
+        int attempts,
+        int delayMilliseconds,
+        out string selected)
     {
         selected = string.Empty;
         try
@@ -394,11 +419,11 @@ public sealed class TargetContext
             using var clipboard = ClipboardSnapshot.Capture();
             var marker = "QuickCalc/" + Guid.NewGuid().ToString("N");
             SetClipboardText(marker);
-            if (!SendChord(NativeMethods.VkControl, NativeMethods.VkC)) return false;
-            for (var attempt = 0; attempt < 4; attempt++)
+            if (!copyAction()) return false;
+            for (var attempt = 0; attempt < attempts; attempt++)
             {
                 Application.DoEvents();
-                Thread.Sleep(5);
+                Thread.Sleep(delayMilliseconds);
                 var value = GetClipboardText();
                 if (value == marker) continue;
                 // VS Code copies the entire current line when nothing is selected.

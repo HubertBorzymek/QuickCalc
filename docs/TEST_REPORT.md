@@ -19,8 +19,8 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
 - `QuickCalc.Core.Tests`: 62 zaliczone, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 17 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 80 przypadków, z czego 79 zaliczonych i 1 pominięty.
+- `QuickCalc.Integration.Tests`: 18 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 81 przypadków, z czego 80 zaliczonych i 1 pominięty.
 
 Pominięty w pełnym przebiegu test wymaga wyłącznego prawa do okna pierwszoplanowego. Uruchomiony osobno (`VerifiedSelectionWithoutWin32IndexesUsesClipboardPasteFallback`) zakończył się powodzeniem: 1 zaliczony, 0 pominiętych. Potwierdza wklejenie przez `Ctrl+V` i odtworzenie schowka w kontrolce bez zapisanych indeksów Win32.
 
@@ -41,6 +41,8 @@ Po regresjach w VS Code i pasku adresu Opery usunięto ponowne używanie zapami�
 Po wykryciu blokującego polecenia kopiowania w Visual Studio tryb bez zaznaczenia nie uruchamia już awaryjnego `Ctrl+C`. Próba schowka jest dopuszczona wyłącznie wtedy, gdy UI Automation jednoznacznie zgłosi niezerową długość zakresu, lecz nie zwróci jego treści. Regresja tej decyzji jest objęta osobnym testem.
 
 Po testach aplikacji GPT i pól Altium wyszukiwanie wzorca tekstowego objęło także nadrzędne kontenery aktywnego elementu. Kontrolki realizujące protokół komunikatów Win32 Edit są wykrywane również przy niestandardowej nazwie klasy, z limitami czasu chroniącymi przed zawieszonym oknem. Zaznaczone `-18.3mm` i wynik bez jednostki zachowuje `mm`. Dla braku zaznaczenia zapamiętany pusty zakres UI Automation odtwarza pozycję kursora po powrocie fokusu, ale zakres zawierający zaznaczenie nadal nie jest ponownie aktywowany ze względu na błąd Opery. Parser względny obsługuje teraz `^2`, samo `r`/`√` oraz dalsze działania, np. `81` z `r*2+1` daje `19`.
+
+Ponieważ część pól Altium nie udostępnia zakresu ani przez `EM_GETSEL`, ani UI Automation, dodano bezpośredni `WM_COPY` do aktywnej kontrolki. W przeciwieństwie do klawiaturowego `Ctrl+C` nie uruchamia on polecenia edytora Visual Studio. Schowek jest oznaczany wartością kontrolną i odtwarzany; wynik jest przyjmowany tylko wtedy, gdy kontrolka faktycznie skopiuje poprawną liczbę z opcjonalną jednostką. Test integracyjny potwierdza odczyt zaznaczonego `25mm` oraz brak fałszywego wyniku przy samym kursorze.
 
 Po raporcie użytkownika naprawiono brak bibliotek UI Automation w publikacji, obsługę zaznaczonej liczby bez jednostki (`23` i `+3` daje `26`), interpretację wyniku Enter, przywracanie pierwszego planu oraz dźwięk systemowy Enter/Escape. Skrypt publikujący kopiuje wymagane biblioteki i uruchamia gotowy EXE z `--self-test`; publikacja jest odrzucana, jeżeli UI Automation lub względny parser nie załadują się z katalogu dystrybucyjnego.
 
