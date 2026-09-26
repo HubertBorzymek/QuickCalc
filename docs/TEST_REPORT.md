@@ -36,6 +36,8 @@ Dodane regresje sprawdzają pełne zaznaczenie dłuższego wyniku, pozycję kurs
 
 Po raporcie o opóźnieniach Visual Studio tryb schowka został całkowicie oddzielony od analizy zaznaczenia. Zapytanie UI Automation ma limit 45 ms i nie może blokować kolejnych wywołań, a awaryjna próba `Ctrl+C` czeka najwyżej około 20 ms. Dziennik zapisuje osobno czas przechwycenia i całkowity czas pokazania popupu. Testy potwierdzają ograniczoną latencję, natychmiastowe przechwycenie podstawowe, zamknięcie popupu po sukcesie oraz ustawienie okna pod prostokątem pola tekstowego.
 
+Po regresjach w VS Code i pasku adresu Opery usunięto ponowne używanie zapamiętanego zakresu UI Automation po zmianie fokusu. Taki zakres COM bywa unieważniany przez przeglądarkę i mógł zmienić albo wyczyścić pole przy anulowaniu. Pusta odpowiedź UI Automation jest teraz uzupełniana krótką próbą `Ctrl+C`; wynik jest uznawany za zaznaczenie tylko wtedy, gdy parser rozpoznaje liczbę z opcjonalną jednostką, dzięki czemu funkcja VS Code „kopiuj cały wiersz bez zaznaczenia” nie daje fałszywego wyniku. Ponowne zaznaczenie wklejonego rezultatu korzysta z sekwencji klawiaturowej, która utrzymuje Shift logicznie przypisany do strzałek aż do ich obsłużenia przez kolejkę docelowej aplikacji.
+
 Po raporcie użytkownika naprawiono brak bibliotek UI Automation w publikacji, obsługę zaznaczonej liczby bez jednostki (`23` i `+3` daje `26`), interpretację wyniku Enter, przywracanie pierwszego planu oraz dźwięk systemowy Enter/Escape. Skrypt publikujący kopiuje wymagane biblioteki i uruchamia gotowy EXE z `--self-test`; publikacja jest odrzucana, jeżeli UI Automation lub względny parser nie załadują się z katalogu dystrybucyjnego.
 
 Po wykryciu `TypeLoadException` usunięto niezgodne biblioteki GAC .NET Framework 4.0. Projekt korzysta teraz z oficjalnego `Microsoft.WindowsDesktop.App.WPF` dla .NET 9. Publikacja zawiera `UIAutomationClient` i `UIAutomationTypes` w wersji 9.0.0.0; suma biblioteki klienckiej została porównana z pakietem runtime .NET 9 i była identyczna.
@@ -57,7 +59,7 @@ Te punkty wymagają testów ręcznych opisanych w README. Sam fakt kompilacji ko
 
 ## Znane ograniczenia
 
-- UI Automation TextPattern pozwala potwierdzić zaznaczenie, ale nie zapewnia uniwersalnej modyfikacji tekstu. Gdy nie można odtworzyć dokładnego zakresu, QuickCalc bezpiecznie odmawia zastąpienia. Wstawianie bez zaznaczenia w kontrolkach niestandardowych zależy od ich obsługi wejścia Unicode.
+- UI Automation TextPattern pozwala potwierdzić zaznaczenie, ale nie zapewnia uniwersalnej modyfikacji tekstu. W kontrolkach niestandardowych QuickCalc korzysta ze standardowego zachowania zaznaczenia podczas `Ctrl+V`; aplikacje, które celowo kasują zaznaczenie przy utracie fokusu, mogą nie obsługiwać zastąpienia.
 - Windows UIPI blokuje sterowanie aplikacją uruchomioną z wyższymi uprawnieniami.
 - Obsługiwany jest wymiar długości; pola, potęgi, funkcje i złożone jednostki nie należą do prototypu.
 - Historia jest przechowywana tylko w pamięci bieżącego procesu.

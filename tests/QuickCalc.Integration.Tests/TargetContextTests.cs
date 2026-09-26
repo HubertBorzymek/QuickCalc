@@ -97,7 +97,8 @@ public sealed class TargetContextTests
             Assert.IsTrue(target.InsertOrReplace(result.Text));
             Application.DoEvents();
             Assert.AreEqual("Value: 30mm", box.Text);
-            Assert.AreEqual("30mm", box.SelectedText);
+            Assert.AreEqual("30mm", box.SelectedText,
+                $"Kursor={box.SelectionStart}, długość={box.SelectionLength}, błąd={target.LastFailureReason ?? "brak"}");
         });
     }
 
@@ -142,6 +143,8 @@ public sealed class TargetContextTests
                 throw new AssertInconclusiveException("Runner testów nie otrzymał prawa do pierwszego planu wymaganego przez SendInput.");
             Application.DoEvents();
             Assert.AreEqual("Value: 30mm", box.Text);
+            Assert.AreEqual("30mm", box.SelectedText,
+                $"Kursor={box.SelectionStart}, długość={box.SelectionLength}, błąd={target.LastFailureReason ?? "brak"}");
         });
     }
 

@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Automation;
 using System.Windows.Automation.Text;
+using QuickCalc.Core;
 
 namespace QuickCalc.Windows;
 
@@ -9,7 +10,6 @@ public sealed class TargetContext
 {
     private static int _automationProbeInFlight;
     private readonly AutomationElement? _automationTarget;
-    private readonly TextPatternRange? _automationRange;
 
     public TargetContext(
         IntPtr windowHandle,
@@ -20,7 +20,7 @@ public sealed class TargetContext
         string detectionMethod,
         Rectangle? targetBounds = null)
         : this(windowHandle, controlHandle, selectionStart, selectionEnd, selectedText, detectionMethod,
-            null, null, targetBounds)
+            null, targetBounds)
     {
     }
 
@@ -32,7 +32,6 @@ public sealed class TargetContext
         string? selectedText,
         string detectionMethod,
         AutomationElement? automationTarget,
-        TextPatternRange? automationRange,
         Rectangle? targetBounds)
     {
         WindowHandle = windowHandle;
@@ -42,7 +41,6 @@ public sealed class TargetContext
         SelectedText = selectedText;
         DetectionMethod = detectionMethod;
         _automationTarget = automationTarget;
-        _automationRange = automationRange;
         TargetBounds = targetBounds;
     }
 
@@ -66,11 +64,14 @@ public sealed class TargetContext
         var control = NativeMethods.GetGUIThreadInfo(thread, ref info) && info.hwndFocus != IntPtr.Zero ? info.hwndFocus : window;
 
         var captured = CaptureForHandles(window, control);
-        if (captured.HasSelection || captured.DetectionMethod != "brak wiarygodnej detekcji" ||
+        // Electron editors can expose TextPattern correctly while returning an empty
+        // selection. A short Ctrl+C probe is still useful there. Do not perform it
+        // after a UIA timeout: opening the popup must remain latency-bounded.
+        if (captured.HasSelection || captured.DetectionMethod.StartsWith("limit czasu", StringComparison.Ordinal) ||
             !TryReadSelectionByCopy(out var copiedSelection)) return captured;
 
         return new TargetContext(window, control, null, null, copiedSelection,
-            "Ctrl+C (niezależne od UI Automation)", null, null, captured.TargetBounds);
+            "Ctrl+C (niezależne od UI Automation)", captured._automationTarget, captured.TargetBounds);
     }
 
     public static TargetContext CaptureForHandles(IntPtr window, IntPtr control)
@@ -83,7 +84,7 @@ public sealed class TargetContext
                 out var automationTarget, out var automationRange, out var automationBounds);
             if (automationStatus == AutomationProbeStatus.Success)
                 return new TargetContext(window, control, null, null, text, "UI Automation TextPattern",
-                    automationTarget, automationRange, automationBounds ?? GetNativeBounds(control));
+                    automationTarget, automationBounds ?? GetNativeBounds(control));
             var method = automationStatus == AutomationProbeStatus.Timeout
                 ? "limit czasu UI Automation — pominięto analizę"
                 : "brak wiarygodnej detekcji";
@@ -131,9 +132,11 @@ public sealed class TargetContext
         try
         {
             // Browser and Electron editors normally expose only their top-level HWND.
-            // Restore the real editable child and the exact selection/caret through UIA.
+            // Restore the real editable child, but never re-use the captured
+            // TextPatternRange. Providers can invalidate or reinterpret that COM
+            // range after focus changes (Opera could consequently clear its field).
+            // The editor itself preserves the native selection used by Ctrl+V.
             _automationTarget.SetFocus();
-            _automationRange?.Select();
             return true;
         }
         catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or
@@ -316,7 +319,10 @@ public sealed class TargetContext
                 Thread.Sleep(5);
                 var value = GetClipboardText();
                 if (value == marker) continue;
-                if (!string.IsNullOrEmpty(value)) { selected = value; return true; }
+                // VS Code copies the entire current line when nothing is selected.
+                // Accept only a value the relative-expression parser recognizes,
+                // preventing that editor feature from becoming a false selection.
+                if (ParsedSelection.TryParse(value, out _)) { selected = value; return true; }
                 return false;
             }
             return false;
@@ -333,22 +339,28 @@ public sealed class TargetContext
 
     private static bool SelectPreviousCharacters(int count)
     {
-        var inputs = new List<NativeMethods.Input>(count * 2 + 2) { VirtualKey(NativeMethods.VkShift, false) };
-        for (var i = 0; i < count; i++)
+        if (count <= 0) return true;
+        try
         {
-            inputs.Add(VirtualKey(NativeMethods.VkLeft, false));
-            inputs.Add(VirtualKey(NativeMethods.VkLeft, true));
+            // SendKeys keeps the modifier logically attached to every arrow until
+            // the receiving queue has processed it. A raw SendInput batch only
+            // guarantees enqueue order; Chromium and some Electron/WinForms queues
+            // can otherwise observe Shift-up before handling the arrow messages.
+            System.Windows.Forms.SendKeys.SendWait($"+{{LEFT {count}}}");
+            return true;
         }
-        inputs.Add(VirtualKey(NativeMethods.VkShift, true));
-        return NativeMethods.SendInput((uint)inputs.Count, [.. inputs], NativeInputSize) == inputs.Count;
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            return false;
+        }
     }
 
-    private static void WaitForInjectedInput()
+    private static void WaitForInjectedInput(int attempts = 10)
     {
         // SendInput only queues the keys. Pumping messages matters when the target
         // lives on this UI thread (tests and some embedded editors) and is harmless
         // for external applications.
-        for (var attempt = 0; attempt < 10; attempt++)
+        for (var attempt = 0; attempt < attempts; attempt++)
         {
             Application.DoEvents();
             Thread.Sleep(10);
