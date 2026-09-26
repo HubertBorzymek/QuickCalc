@@ -10,6 +10,7 @@ public sealed class TargetContext
 {
     private static int _automationProbeInFlight;
     private readonly AutomationElement? _automationTarget;
+    private readonly bool _automationIndicatedSelection;
 
     public TargetContext(
         IntPtr windowHandle,
@@ -20,7 +21,7 @@ public sealed class TargetContext
         string detectionMethod,
         Rectangle? targetBounds = null)
         : this(windowHandle, controlHandle, selectionStart, selectionEnd, selectedText, detectionMethod,
-            null, targetBounds)
+            null, false, targetBounds)
     {
     }
 
@@ -32,6 +33,7 @@ public sealed class TargetContext
         string? selectedText,
         string detectionMethod,
         AutomationElement? automationTarget,
+        bool automationIndicatedSelection,
         Rectangle? targetBounds)
     {
         WindowHandle = windowHandle;
@@ -41,6 +43,7 @@ public sealed class TargetContext
         SelectedText = selectedText;
         DetectionMethod = detectionMethod;
         _automationTarget = automationTarget;
+        _automationIndicatedSelection = automationIndicatedSelection;
         TargetBounds = targetBounds;
     }
 
@@ -64,14 +67,16 @@ public sealed class TargetContext
         var control = NativeMethods.GetGUIThreadInfo(thread, ref info) && info.hwndFocus != IntPtr.Zero ? info.hwndFocus : window;
 
         var captured = CaptureForHandles(window, control);
-        // Electron editors can expose TextPattern correctly while returning an empty
-        // selection. A short Ctrl+C probe is still useful there. Do not perform it
-        // after a UIA timeout: opening the popup must remain latency-bounded.
-        if (captured.HasSelection || captured.DetectionMethod.StartsWith("limit czasu", StringComparison.Ordinal) ||
+        // Never invoke an editor command merely because UIA returned no text.
+        // Visual Studio can serialize Ctrl+C behind a busy editor operation and
+        // display a long "wait for an editor command" dialog. Use the clipboard
+        // probe only when UIA positively reported a non-degenerate range.
+        if (!ShouldProbeClipboard(captured.HasSelection, captured._automationIndicatedSelection) ||
             !TryReadSelectionByCopy(out var copiedSelection)) return captured;
 
         return new TargetContext(window, control, null, null, copiedSelection,
-            "Ctrl+C (niezależne od UI Automation)", captured._automationTarget, captured.TargetBounds);
+            "Ctrl+C po potwierdzeniu zakresu przez UI Automation", captured._automationTarget, true,
+            captured.TargetBounds);
     }
 
     public static TargetContext CaptureForHandles(IntPtr window, IntPtr control)
@@ -81,10 +86,11 @@ public sealed class TargetContext
             if (TryStandardEditSelection(control, out var start, out var end, out var text))
                 return new TargetContext(window, control, start, end, text, "Win32 EM_GETSEL", GetNativeBounds(control));
             var automationStatus = TryAutomationSelectionWithTimeout(control, out text,
-                out var automationTarget, out var automationRange, out var automationBounds);
+                out var automationTarget, out var automationRange, out var automationBounds,
+                out var automationIndicatedSelection);
             if (automationStatus == AutomationProbeStatus.Success)
                 return new TargetContext(window, control, null, null, text, "UI Automation TextPattern",
-                    automationTarget, automationBounds ?? GetNativeBounds(control));
+                    automationTarget, automationIndicatedSelection, automationBounds ?? GetNativeBounds(control));
             var method = automationStatus == AutomationProbeStatus.Timeout
                 ? "limit czasu UI Automation — pominięto analizę"
                 : "brak wiarygodnej detekcji";
@@ -98,6 +104,9 @@ public sealed class TargetContext
                 $"tryb bezpieczny po błędzie {ex.GetType().Name}");
         }
     }
+
+    internal static bool ShouldProbeClipboard(bool hasSelection, bool automationIndicatedSelection) =>
+        !hasSelection && automationIndicatedSelection;
 
     public static TargetContext CaptureBasic(string reason)
     {
@@ -233,9 +242,11 @@ public sealed class TargetContext
         out string? selected,
         out AutomationElement? automationTarget,
         out TextPatternRange? automationRange,
-        out Rectangle? automationBounds)
+        out Rectangle? automationBounds,
+        out bool automationIndicatedSelection)
     {
         selected = null; automationTarget = null; automationRange = null; automationBounds = null;
+        automationIndicatedSelection = false;
         if (Interlocked.CompareExchange(ref _automationProbeInFlight, 1, 0) != 0)
             return AutomationProbeStatus.Timeout;
 
@@ -243,14 +254,23 @@ public sealed class TargetContext
         AutomationElement? workerTarget = null;
         TextPatternRange? workerRange = null;
         Rectangle? workerBounds = null;
+        var workerIndicatedSelection = false;
         var succeeded = false;
         var finished = new ManualResetEventSlim();
         var worker = new Thread(() =>
         {
             try
             {
-                succeeded = TryAutomationSelection(control, out workerSelected, out workerTarget, out workerRange);
+                succeeded = TryAutomationSelection(control, out workerSelected, out workerTarget, out workerRange,
+                    out workerIndicatedSelection);
                 if (succeeded) workerBounds = GetAutomationBounds(workerTarget);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+            {
+                // A provider can disappear between obtaining the focused element
+                // and reading its range. Optional detection must never terminate
+                // either QuickCalc or the process hosting an integration test.
+                succeeded = false;
             }
             finally { Interlocked.Exchange(ref _automationProbeInFlight, 0); finished.Set(); }
         }) { IsBackground = true, Name = "QuickCalc UI Automation probe" };
@@ -260,6 +280,7 @@ public sealed class TargetContext
         if (!succeeded) return AutomationProbeStatus.Unavailable;
         selected = workerSelected; automationTarget = workerTarget; automationRange = workerRange;
         automationBounds = workerBounds;
+        automationIndicatedSelection = workerIndicatedSelection;
         return AutomationProbeStatus.Success;
     }
 
@@ -267,18 +288,20 @@ public sealed class TargetContext
         IntPtr control,
         out string? selected,
         out AutomationElement? automationTarget,
-        out TextPatternRange? automationRange)
+        out TextPatternRange? automationRange,
+        out bool automationIndicatedSelection)
     {
-        selected = null; automationTarget = null; automationRange = null;
+        selected = null; automationTarget = null; automationRange = null; automationIndicatedSelection = false;
         try
         {
             // Browser/Electron address bars and editors often share a top-level HWND.
             // The globally focused UIA element identifies the actual editable child.
             var element = AutomationElement.FocusedElement;
-            if (!TryGetTextSelection(element, out selected, out automationRange))
+            if (!TryGetTextSelection(element, out selected, out automationRange, out automationIndicatedSelection))
             {
                 element = AutomationElement.FromHandle(control);
-                if (!TryGetTextSelection(element, out selected, out automationRange)) return false;
+                if (!TryGetTextSelection(element, out selected, out automationRange,
+                        out automationIndicatedSelection)) return false;
             }
             automationTarget = element;
             return true;
@@ -287,18 +310,22 @@ public sealed class TargetContext
         catch (InvalidOperationException) { return false; }
         catch (UnauthorizedAccessException) { return false; }
         catch (COMException) { return false; }
+        catch (ArgumentException) { return false; }
     }
 
     private static bool TryGetTextSelection(
         AutomationElement? element,
         out string? selected,
-        out TextPatternRange? selectionRange)
+        out TextPatternRange? selectionRange,
+        out bool indicatedSelection)
     {
-        selected = null; selectionRange = null;
+        selected = null; selectionRange = null; indicatedSelection = false;
         if (element is null || !element.TryGetCurrentPattern(TextPattern.Pattern, out var pattern)) return false;
         var ranges = ((TextPattern)pattern).GetSelection();
         if (ranges.Length != 1) return false;
         selectionRange = ranges[0];
+        indicatedSelection = selectionRange.CompareEndpoints(TextPatternRangeEndpoint.Start, selectionRange,
+            TextPatternRangeEndpoint.End) != 0;
         var value = selectionRange.GetText(-1);
         if (!string.IsNullOrEmpty(value)) selected = value;
         return true;

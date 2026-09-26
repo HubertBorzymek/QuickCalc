@@ -55,6 +55,17 @@ public sealed class TargetContextTests
     }
 
     [TestMethod]
+    public void ClipboardProbeIsNeverUsedForAnUnselectedOrUnknownRange()
+    {
+        Assert.IsFalse(TargetContext.ShouldProbeClipboard(hasSelection: false,
+            automationIndicatedSelection: false));
+        Assert.IsFalse(TargetContext.ShouldProbeClipboard(hasSelection: true,
+            automationIndicatedSelection: true));
+        Assert.IsTrue(TargetContext.ShouldProbeClipboard(hasSelection: false,
+            automationIndicatedSelection: true));
+    }
+
+    [TestMethod]
     public void StandardEditSelectionCanBeCapturedAndReplaced()
     {
         Exception? failure = null;

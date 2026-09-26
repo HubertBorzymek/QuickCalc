@@ -64,7 +64,7 @@ Publikacja samowystarczalna dla Windows x64 trafia do `artifacts/publish`. Nie j
 
 ## Bezpieczeństwo i ograniczenia
 
-Standardowe kontrolki Edit/RichEdit są obsługiwane bezpośrednio przez `EM_GETSEL`, `EM_SETSEL` i `EM_REPLACESEL`. Dla innych kontrolek aplikacja najpierw korzysta z UI Automation TextPattern, a następnie ma niezależny mechanizm wykrywania zaznaczenia przez chwilowe `Ctrl+C`. Wynik jest wstawiany jak przez `Ctrl+V`; wcześniejsza zawartość i formaty schowka są odtwarzane po operacji.
+Standardowe kontrolki Edit/RichEdit są obsługiwane bezpośrednio przez `EM_GETSEL`, `EM_SETSEL` i `EM_REPLACESEL`. Dla innych kontrolek aplikacja najpierw korzysta z UI Automation TextPattern. Chwilowe `Ctrl+C` jest używane tylko wtedy, gdy UI Automation potwierdzi niezerowy zakres, ale nie zwróci jego treści — nigdy w zwykłym trybie bez zaznaczenia. Wynik jest wstawiany jak przez `Ctrl+V`; wcześniejsza zawartość i formaty schowka są odtwarzane po operacji.
 
 W przeglądarkach, VS Code i aplikacjach Electron UI Automation jest tylko pomocą, a nie warunkiem wstawienia. QuickCalc nie próbuje ponownie aktywować zapamiętanego zakresu UI Automation po zmianie fokusu, ponieważ niektóre przeglądarki unieważniają taki zakres i mogłyby zmienić zawartość pola. Po przywróceniu aplikacji wysyłane jest standardowe `Ctrl+V`. Jeśli wcześniej istniało zaznaczenie, cały wklejony wynik zostaje ponownie zaznaczony; bez zaznaczenia kursor pozostaje za wynikiem. Nieobsłużone wyjątki interfejsu są zapisywane w `quickcalc-error.log` obok programu.
 
