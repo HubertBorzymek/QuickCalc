@@ -19,8 +19,8 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
 - `QuickCalc.Core.Tests`: 83 zaliczone, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 20 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 104 przypadki, z czego 103 zaliczone i 1 pominięty.
+- `QuickCalc.Integration.Tests`: 26 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 110 przypadków, z czego 109 zaliczonych i 1 pominięty.
 
 Testy klawiaturowego `Ctrl+C` i awaryjnego `Ctrl+V` wymagają wyłącznego prawa do okna pierwszoplanowego. W ostatnim pełnym przebiegu runner nie przyznał go testowi kopiowania, dlatego został oznaczony jako pominięty zamiast fałszywie pozytywnego. Test wklejenia i ponownego zaznaczenia przeszedł; oba przepływy mają także niezależne testy polityki i schowka.
 
@@ -33,6 +33,8 @@ Końcowy test przeglądarkowy wykrył właściwą przyczynę wcześniejszych odm
 Po kolejnym raporcie usunięto błędny warunek wymagający, aby dostawca UI Automation po utracie i odzyskaniu fokusu zwrócił identyczny tekst zaznaczenia. Zaznaczenie niestandardowych edytorów jest teraz dodatkowo wykrywane przez tymczasowe `Ctrl+C`, a wynik trafia do nich przez standardowe `Ctrl+V` z odtworzeniem wcześniejszego schowka. Test integracyjny wykrył i naprawił wyścig, w którym stary schowek mógł zostać przywrócony przed obsłużeniem `Ctrl+V`.
 
 Dodane regresje sprawdzają pełne zaznaczenie dłuższego wyniku, pozycję kursora po wstawieniu bez zaznaczenia, zachowanie odstępu przed jednostką, przedrostki SI i jednostki elektroniczne, potęgowanie, pierwiastek `r` oraz zatwierdzenie z konwersją SI przez `Shift+Enter` (`2cm / 500 → 0.04mm`, `5ft → 1.524m`). Parser sprawdza też `ln` o podstawie `e`, `log` o podstawie 10, stałe `e`, `pi`/`π`, krótką składnię bez nawiasów i warianty względne na zaznaczonej liczbie. Wartości niedodatnie i argumenty z jednostką są dla logarytmów odrzucane.
+
+Przebudowany popup jest objęty testami rzeczywistego formularza WinForms: borderless Compact, live preview, inline error ze zmianą wysokości, przełączanie Compact/Expanded z zachowaniem tekstu i fokusu, Enter, Shift+Enter dla jednostki oraz skalara, Escape, pozycja pod polem kontekstowym i pozycja przy kursorze w granicach monitora. Oba warianty zostały dodatkowo wyrenderowane i sprawdzone wizualnie. Aplikacja używa trybu DPI `PerMonitorV2`, a zmianę DPI obsługuje ponownym przeliczeniem układu i położenia.
 
 Po raporcie o opóźnieniach Visual Studio tryb schowka został całkowicie oddzielony od analizy zaznaczenia. Zapytanie UI Automation ma limit 45 ms i nie może blokować kolejnych wywołań, a awaryjna próba `Ctrl+C` czeka najwyżej około 20 ms. Dziennik zapisuje osobno czas przechwycenia i całkowity czas pokazania popupu. Testy potwierdzają ograniczoną latencję, natychmiastowe przechwycenie podstawowe, zamknięcie popupu po sukcesie oraz ustawienie okna pod prostokątem pola tekstowego.
 

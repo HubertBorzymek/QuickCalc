@@ -34,7 +34,12 @@ internal sealed class QuickCalcContext : ApplicationContext
             try
             {
                 AddDiagnostic($"Odebrano WM_HOTKEY, identyfikator {id}.");
-                if (id == 1) Open(CalculatorMode.Context);
+                if (id == 1 && _popup is { Visible: true })
+                {
+                    _popup.ToggleExpanded();
+                    AddDiagnostic($"Przełączono popup na widok {(_popup.IsExpanded ? "Expanded" : "Compact")}.");
+                }
+                else if (id == 1) Open(CalculatorMode.Context);
                 else if (id == 2) Open(CalculatorMode.Clipboard);
                 else AddDiagnostic($"Nieznany identyfikator skrótu: {id}.");
             }

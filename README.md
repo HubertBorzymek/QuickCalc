@@ -28,7 +28,9 @@ Domyślne skróty:
 
 Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Nie rejestruje autostartu.
 
-W trybie kontekstowym popup jest ustawiany lekko pod aktywnym polem tekstowym (lub nad nim, gdy pod spodem brakuje miejsca). Tryb schowka otwiera się przy kursorze myszy. Tryb schowka nie uruchamia analizy zaznaczenia, a zapytanie UI Automation trybu kontekstowego ma twardy limit czasu, więc wadliwy dostawca edytora nie może blokować pojawienia się okna.
+Popup domyślnie otwiera się jako ciemny, półprzezroczysty pasek **Compact** bez systemowego paska tytułu. Pokazuje zaznaczoną wartość, pole wyrażenia i wynik aktualizowany podczas pisania. Ponowne naciśnięcie `F16`, gdy popup jest otwarty, przełącza **Compact ↔ Expanded** bez kasowania wyrażenia ani utraty fokusu. Widok Expanded dodaje tryb pracy, zaznaczenie, rodzaj działania, historię, skróty oraz błąd parsera. Zwykłe błędy są pokazywane wewnątrz popupu, bez MessageBoxów.
+
+W trybie kontekstowym popup jest ustawiany lekko pod aktywnym polem tekstowym (lub nad nim, gdy pod spodem brakuje miejsca). Tryb schowka otwiera się przy kursorze myszy. Położenie i rozmiar są przeliczane dla bieżącego monitora i jego DPI, a popup pozostaje w obszarze roboczym. Tryb schowka nie uruchamia analizy zaznaczenia, a zapytanie UI Automation trybu kontekstowego ma twardy limit czasu, więc wadliwy dostawca edytora nie może blokować pojawienia się okna.
 
 ### Diagnostyka skrótów
 
