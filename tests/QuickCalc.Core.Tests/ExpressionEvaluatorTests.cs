@@ -20,6 +20,14 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("2^3^2", null, "512")]
     [DataRow("r81", null, "9")]
     [DataRow("√(9+7)", null, "4")]
+    [DataRow("ln(e)", null, "1")]
+    [DataRow("ln e", null, "1")]
+    [DataRow("log1000", null, "3")]
+    [DataRow("log(100)", null, "2")]
+    [DataRow("pi", null, "3.14159265358979")]
+    [DataRow("π", null, "3.14159265358979")]
+    [DataRow("e", null, "2.71828182845905")]
+    [DataRow("2*pi", null, "6.28318530717959")]
     [DataRow("4.7kΩ*2", null, "9.4kΩ")]
     [DataRow("3.3V+700mV", null, "4V")]
     [DataRow("10uF/2", null, "5µF")]
@@ -49,6 +57,12 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("r+7", "81", "16")]
     [DataRow("r*2+1", "81", "19")]
     [DataRow("√/3", "81", "3")]
+    [DataRow("log", "100", "2")]
+    [DataRow("log*3", "100", "6")]
+    [DataRow("ln", "1", "0")]
+    [DataRow("ln+2", "1", "2")]
+    [DataRow("ln e", "100", "1")]
+    [DataRow("log 1000", "25", "3")]
     public void EvaluatesRelativeExpressions(string expression, string selection, string expected)
         => Assert.AreEqual(expected, _sut.Evaluate(expression, selection).Text);
 
@@ -68,6 +82,8 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("/2")]
     [DataRow("^2")]
     [DataRow("r")]
+    [DataRow("ln")]
+    [DataRow("log")]
     public void RelativeOperationRequiresSelection(string expression)
         => Assert.ThrowsExactly<CalculationException>(() => _sut.Evaluate(expression));
 
@@ -79,6 +95,11 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("abc")]
     [DataRow("r-1")]
     [DataRow("2mm^2")]
+    [DataRow("ln(0)")]
+    [DataRow("ln(-1)")]
+    [DataRow("log(0)")]
+    [DataRow("log(-10)")]
+    [DataRow("ln(2mm)")]
     public void RejectsInvalidOrUnsupportedExpressions(string expression)
         => Assert.ThrowsExactly<CalculationException>(() => _sut.Evaluate(expression));
 

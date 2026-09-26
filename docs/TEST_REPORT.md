@@ -18,9 +18,9 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
-- `QuickCalc.Core.Tests`: 62 zaliczone, 0 niezaliczonych, 0 pominiętych;
+- `QuickCalc.Core.Tests`: 83 zaliczone, 0 niezaliczonych, 0 pominiętych;
 - `QuickCalc.Integration.Tests`: 20 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 83 przypadki, z czego 82 zaliczone i 1 pominięty.
+- łącznie: 104 przypadki, z czego 103 zaliczone i 1 pominięty.
 
 Testy klawiaturowego `Ctrl+C` i awaryjnego `Ctrl+V` wymagają wyłącznego prawa do okna pierwszoplanowego. W ostatnim pełnym przebiegu runner nie przyznał go testowi kopiowania, dlatego został oznaczony jako pominięty zamiast fałszywie pozytywnego. Test wklejenia i ponownego zaznaczenia przeszedł; oba przepływy mają także niezależne testy polityki i schowka.
 
@@ -32,7 +32,7 @@ Końcowy test przeglądarkowy wykrył właściwą przyczynę wcześniejszych odm
 
 Po kolejnym raporcie usunięto błędny warunek wymagający, aby dostawca UI Automation po utracie i odzyskaniu fokusu zwrócił identyczny tekst zaznaczenia. Zaznaczenie niestandardowych edytorów jest teraz dodatkowo wykrywane przez tymczasowe `Ctrl+C`, a wynik trafia do nich przez standardowe `Ctrl+V` z odtworzeniem wcześniejszego schowka. Test integracyjny wykrył i naprawił wyścig, w którym stary schowek mógł zostać przywrócony przed obsłużeniem `Ctrl+V`.
 
-Dodane regresje sprawdzają pełne zaznaczenie dłuższego wyniku, pozycję kursora po wstawieniu bez zaznaczenia, zachowanie odstępu przed jednostką, przedrostki SI i jednostki elektroniczne, potęgowanie, pierwiastek `r` oraz zatwierdzenie z konwersją SI przez `Shift+Enter` (`2cm / 500 → 0.04mm`, `5ft → 1.524m`).
+Dodane regresje sprawdzają pełne zaznaczenie dłuższego wyniku, pozycję kursora po wstawieniu bez zaznaczenia, zachowanie odstępu przed jednostką, przedrostki SI i jednostki elektroniczne, potęgowanie, pierwiastek `r` oraz zatwierdzenie z konwersją SI przez `Shift+Enter` (`2cm / 500 → 0.04mm`, `5ft → 1.524m`). Parser sprawdza też `ln` o podstawie `e`, `log` o podstawie 10, stałe `e`, `pi`/`π`, krótką składnię bez nawiasów i warianty względne na zaznaczonej liczbie. Wartości niedodatnie i argumenty z jednostką są dla logarytmów odrzucane.
 
 Po raporcie o opóźnieniach Visual Studio tryb schowka został całkowicie oddzielony od analizy zaznaczenia. Zapytanie UI Automation ma limit 45 ms i nie może blokować kolejnych wywołań, a awaryjna próba `Ctrl+C` czeka najwyżej około 20 ms. Dziennik zapisuje osobno czas przechwycenia i całkowity czas pokazania popupu. Testy potwierdzają ograniczoną latencję, natychmiastowe przechwycenie podstawowe, zamknięcie popupu po sukcesie oraz ustawienie okna pod prostokątem pola tekstowego.
 
@@ -71,5 +71,5 @@ Te punkty wymagają testów ręcznych opisanych w README. Sam fakt kompilacji ko
 
 - UI Automation TextPattern pozwala potwierdzić zaznaczenie, ale nie zapewnia uniwersalnej modyfikacji tekstu. W kontrolkach niestandardowych QuickCalc korzysta ze standardowego zachowania zaznaczenia podczas `Ctrl+V`; aplikacje, które celowo kasują zaznaczenie przy utracie fokusu, mogą nie obsługiwać zastąpienia.
 - Windows UIPI blokuje sterowanie aplikacją uruchomioną z wyższymi uprawnieniami.
-- Obsługiwany jest wymiar długości; pola, potęgi, funkcje i złożone jednostki nie należą do prototypu.
+- Potęgowanie, pierwiastki i logarytmy działają wyłącznie na skalarach; potęgi jednostek i jednostki złożone nie należą do prototypu. Dostępny jest pierwiastek kwadratowy oraz logarytmy o podstawie `e` i 10, bez osobnej składni dla innych stopni i podstaw.
 - Historia jest przechowywana tylko w pamięci bieżącego procesu.

@@ -40,13 +40,15 @@ Menu ikony zawiera również osobne polecenia otwierające oba tryby bez użycia
 
 ## Wyrażenia i jednostki
 
-Obsługiwane są `+`, `-`, `*`, `/`, potęgowanie `^`, nawiasy, znaki jednoargumentowe, kropka i przecinek dziesiętny. Pierwiastek kwadratowy zapisuje się krótko jako `r`, np. `r81` albo `r(9+7)`; akceptowany jest również znak `√`. Dla zaznaczonej liczby `^2` podnosi ją do kwadratu, samo `r` ją pierwiastkuje, a dalsze działania można dopisać normalnie, np. zaznaczone `81` i `r*2+1` daje `19`.
+Obsługiwane są `+`, `-`, `*`, `/`, potęgowanie `^`, nawiasy, znaki jednoargumentowe, kropka i przecinek dziesiętny. Pierwiastek kwadratowy zapisuje się krótko jako `r`, np. `r81` albo `r(9+7)`; akceptowany jest również znak `√`. Logarytm naturalny zapisuje się jako `ln`, a dziesiętny jako `log`, np. `ln(e)`, `ln e`, `log1000` albo `log(100)`. Dostępne są stałe `e`, `pi` i `π`, więc działa też np. `2*pi`. Inne stopnie pierwiastka i inne podstawy logarytmu nie mają osobnej krótkiej składni.
+
+Dla zaznaczonej liczby `^2` podnosi ją do kwadratu, samo `r` ją pierwiastkuje, samo `ln` oblicza logarytm naturalny, a samo `log` — dziesiętny. Dalsze działania można dopisać normalnie: zaznaczone `81` i `r*2+1` daje `19`, a zaznaczone `100` i `log*3` daje `6`. Podanie argumentu po nazwie funkcji tworzy zwykłe wyrażenie niezależne od zaznaczenia, np. `ln e` lub `log 1000`.
 
 Parser obsługuje jednostki bazowe SI i ich przedrostki (m.in. `m`, `kg`, `s`, `A`, `K`, `mol`, `cd`) oraz jednostki używane w elektronice i technice: `V`, `Ω`/`ohm`, `F`, `H`, `Hz`, `W`, `N`, `Pa`, `J`, `C`, `S`, `Wb`, `T`. Dostępne są również `in`/`inch`, `ft`, `yd`, `mi`, `mil`, `min` i `h`. Przedrostek `u` jest przyjmowany jako łatwy do wpisania odpowiednik `µ`.
 
 Spacja przed jednostką jest zachowywana: `10mm/2` daje `5mm`, natomiast `10 mm/2` daje `5 mm`. `Enter` zachowuje jednostkę wejściową, a `Shift+Enter` dobiera czytelną jednostkę SI, np. zaznaczone `2cm` i `/500` daje `0.04mm`, zaś `5ft` i `*1` daje `1.524m`.
 
-Wyrażenie zaczynające się od operatora jest względne względem prawidłowo zaznaczonej liczby; dotyczy to również `^`. Samo `r`/`√` albo pierwiastek z następującym działaniem również używa zaznaczenia. Wyjątkiem jest `-5` bez zaznaczenia, które oznacza liczbę ujemną. Przykłady: zaznaczone `25mm` i `+5` daje `30mm`; `1in+5mm` daje wynik w calach. Potęgowanie i pierwiastkowanie wielkości z jednostkami pozostaje odrzucane, ponieważ wynik wymagałby obsługi jednostek złożonych.
+Wyrażenie zaczynające się od operatora jest względne względem prawidłowo zaznaczonej liczby; dotyczy to również `^`. Samo `r`/`√`, `ln` lub `log` oraz funkcja z następującym działaniem również używa zaznaczenia. Wyjątkiem jest `-5` bez zaznaczenia, które oznacza liczbę ujemną. Przykłady: zaznaczone `25mm` i `+5` daje `30mm`; `1in+5mm` daje wynik w calach. Potęgowanie, pierwiastkowanie i logarytmy wielkości z jednostkami pozostają odrzucane, ponieważ nie są działaniami na obsługiwanej wartości skalarnej.
 
 ## Zmiana skrótów
 

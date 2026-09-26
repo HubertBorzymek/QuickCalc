@@ -40,15 +40,33 @@ public sealed class ExpressionEvaluator
     private static bool IsRelative(string text, bool hasSelection)
     {
         if (text.Length == 0) return false;
-        if (hasSelection && text[0] is 'r' or '√')
-            return text.Length == 1 || text[1] is '+' or '-' or '*' or '/' or '^' || char.IsWhiteSpace(text[1]);
+        var functionLength = RelativeFunctionLength(text);
+        if (functionLength > 0)
+        {
+            var position = functionLength;
+            while (position < text.Length && char.IsWhiteSpace(text[position])) position++;
+            if (position == text.Length) return true;
+            return hasSelection && text[position] is '+' or '-' or '*' or '/' or '^';
+        }
         if (text[0] is not ('+' or '-' or '*' or '/' or '^')) return false;
         if (text[0] == '-' && !hasSelection) return false;
         return true;
     }
 
-    private static string ExpandRelativeExpression(string text) =>
-        text[0] is 'r' or '√' ? text[0] + "@" + text[1..] : "@" + text;
+    private static string ExpandRelativeExpression(string text)
+    {
+        var functionLength = RelativeFunctionLength(text);
+        return functionLength > 0
+            ? text[..functionLength] + "@" + text[functionLength..]
+            : "@" + text;
+    }
+
+    private static int RelativeFunctionLength(string text)
+    {
+        if (text.StartsWith("log", StringComparison.OrdinalIgnoreCase)) return 3;
+        if (text.StartsWith("ln", StringComparison.OrdinalIgnoreCase)) return 2;
+        return text[0] is 'r' or '√' ? 1 : 0;
+    }
 
     private static string Format(double value)
     {
@@ -104,6 +122,8 @@ public sealed class ExpressionEvaluator
             SkipWhite();
             if (Take('+')) return ParseUnary();
             if (Take('-')) { var q = ParseUnary(); return q with { BaseValue = -q.BaseValue }; }
+            if (TakeWord("ln")) return ApplyLogarithm(ParseUnary(), natural: true);
+            if (TakeWord("log")) return ApplyLogarithm(ParseUnary(), natural: false);
             if (Take('r') || Take('√'))
             {
                 var q = ParseUnary();
@@ -112,6 +132,15 @@ public sealed class ExpressionEvaluator
                 return Quantity.Scalar(Math.Sqrt(q.BaseValue));
             }
             return ParsePower();
+        }
+
+        private Quantity ApplyLogarithm(Quantity value, bool natural)
+        {
+            if (value.Dimension != Dimension.Scalar)
+                throw Error("Logarytm z wartości z jednostką nie jest obsługiwany");
+            if (value.BaseValue <= 0)
+                throw Error("Logarytm wymaga liczby większej od zera");
+            return Quantity.Scalar(natural ? Math.Log(value.BaseValue) : Math.Log10(value.BaseValue));
         }
 
         private Quantity ParsePower()
@@ -129,6 +158,8 @@ public sealed class ExpressionEvaluator
         {
             SkipWhite();
             if (Take('@')) return relativeSeed ?? throw Error("Brak zaznaczonej wartości");
+            if (TakeWord("pi") || Take('π')) return Quantity.Scalar(Math.PI);
+            if (TakeWord("e")) return Quantity.Scalar(Math.E);
             if (Take('('))
             {
                 var value = ParseAddSubtract();
@@ -200,6 +231,14 @@ public sealed class ExpressionEvaluator
         {
             if (_position >= text.Length || text[_position] != expected) return false;
             _position++;
+            return true;
+        }
+        private bool TakeWord(string expected)
+        {
+            if (_position + expected.Length > text.Length ||
+                !text.AsSpan(_position, expected.Length).Equals(expected.AsSpan(), StringComparison.OrdinalIgnoreCase))
+                return false;
+            _position += expected.Length;
             return true;
         }
         private void SkipWhite() { while (_position < text.Length && char.IsWhiteSpace(text[_position])) _position++; }
