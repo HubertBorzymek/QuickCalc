@@ -37,4 +37,31 @@ public sealed class CalculatorPopupTests
         Assert.IsTrue(done.Wait(TimeSpan.FromSeconds(10)), "Test popupu przekroczył limit czasu.");
         if (failure is not null) throw failure;
     }
+
+    [TestMethod]
+    public void ShiftEnterSubmissionCanConvertImperialSelectionToSi()
+    {
+        Exception? failure = null;
+        using var done = new ManualResetEventSlim();
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var popup = new CalculatorPopup(CalculatorMode.Context,
+                    new TargetContext((IntPtr)1, (IntPtr)1, null, null, "5ft", "test"),
+                    new ExpressionEvaluator(), new ExpressionHistory());
+                PopupOperation? completed = null;
+                popup.OperationFinished += (_, operation) => completed = operation;
+                popup.Controls.OfType<TextBox>().Single().Text = "*1";
+                popup.Submit(convertToSi: true);
+                Assert.IsNotNull(completed);
+                Assert.AreEqual("1.524m", completed.Result);
+            }
+            catch (Exception ex) { failure = ex; }
+            finally { done.Set(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA); thread.Start();
+        Assert.IsTrue(done.Wait(TimeSpan.FromSeconds(10)));
+        if (failure is not null) throw failure;
+    }
 }

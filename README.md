@@ -20,6 +20,8 @@ Domyślne skróty:
 
 - `F16` — kalkulator kontekstowy; wynik zastępuje zaznaczenie lub trafia w pozycję kursora.
 - `Ctrl+F16` — kalkulator schowka; wynik zostaje skopiowany, ale nie jest wklejany.
+- `Enter` — zatwierdzenie z zachowaniem jednostki wejściowej.
+- `Shift+Enter` — zatwierdzenie z konwersją do czytelnej jednostki SI.
 - `Escape` — anulowanie bez zmiany tekstu i schowka.
 
 Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Nie rejestruje autostartu.
@@ -34,7 +36,11 @@ Menu ikony zawiera również osobne polecenia otwierające oba tryby bez użycia
 
 ## Wyrażenia i jednostki
 
-Obsługiwane są `+`, `-`, `*`, `/`, nawiasy, znaki jednoargumentowe, kropka i przecinek dziesiętny oraz jednostki `mm`, `mil`, `in`/`inch`. Parser nie wykonuje kodu użytkownika. W działaniach bez zaznaczenia wyniki długości zachowują pierwszą jawną jednostkę. W trybie kontekstowym wynik zachowuje jednostkę oraz odstęp zaznaczonego tekstu.
+Obsługiwane są `+`, `-`, `*`, `/`, potęgowanie `^`, nawiasy, znaki jednoargumentowe, kropka i przecinek dziesiętny. Pierwiastek kwadratowy zapisuje się krótko jako `r`, np. `r81` albo `r(9+7)`; akceptowany jest również znak `√`.
+
+Parser obsługuje jednostki bazowe SI i ich przedrostki (m.in. `m`, `kg`, `s`, `A`, `K`, `mol`, `cd`) oraz jednostki używane w elektronice i technice: `V`, `Ω`/`ohm`, `F`, `H`, `Hz`, `W`, `N`, `Pa`, `J`, `C`, `S`, `Wb`, `T`. Dostępne są również `in`/`inch`, `ft`, `yd`, `mi`, `mil`, `min` i `h`. Przedrostek `u` jest przyjmowany jako łatwy do wpisania odpowiednik `µ`.
+
+Spacja przed jednostką jest zachowywana: `10mm/2` daje `5mm`, natomiast `10 mm/2` daje `5 mm`. `Enter` zachowuje jednostkę wejściową, a `Shift+Enter` dobiera czytelną jednostkę SI, np. zaznaczone `2cm` i `/500` daje `0.04mm`, zaś `5ft` i `*1` daje `1.524m`.
 
 Wyrażenie zaczynające się od operatora jest względne względem prawidłowo zaznaczonej liczby. Wyjątkiem jest `-5` bez zaznaczenia, które oznacza liczbę ujemną. Przykłady: zaznaczone `25mm` i `+5` daje `30mm`; `1in+5mm` daje wynik w calach. Mnożenie dwóch długości i inne nieobsługiwane wymiary są odrzucane.
 
@@ -56,11 +62,11 @@ Publikacja samowystarczalna dla Windows x64 trafia do `artifacts/publish`. Nie j
 
 ## Bezpieczeństwo i ograniczenia
 
-Standardowe kontrolki Edit/RichEdit są obsługiwane bezpośrednio przez `EM_GETSEL`, `EM_SETSEL` i `EM_REPLACESEL`. Dla innych kontrolek UI Automation TextPattern służy do potwierdzenia faktycznego zaznaczenia. Jeśli zaznaczenia nie da się wiarygodnie odczytać, działania względne są wyłączone; absolutne wstawienie nadal może użyć wejścia Unicode po sprawdzeniu istnienia pierwotnego okna.
+Standardowe kontrolki Edit/RichEdit są obsługiwane bezpośrednio przez `EM_GETSEL`, `EM_SETSEL` i `EM_REPLACESEL`. Dla innych kontrolek aplikacja najpierw korzysta z UI Automation TextPattern, a następnie ma niezależny mechanizm wykrywania zaznaczenia przez chwilowe `Ctrl+C`. Wynik jest wstawiany jak przez `Ctrl+V`; wcześniejsza zawartość i formaty schowka są odtwarzane po operacji.
 
-W przeglądarkach i aplikacjach Electron zaznaczenie jest pobierane z aktualnie aktywnego elementu UI Automation, a wynik zastępuje zachowane zaznaczenie przez wejście Unicode po przywróceniu poprzedniego okna. Błąd dostawcy UI Automation nie blokuje już otwarcia kalkulatora — popup przechodzi wtedy do trybu bezpiecznego bez zaznaczenia. Nieobsłużone wyjątki interfejsu są zapisywane w `quickcalc-error.log` obok programu.
+W przeglądarkach, VS Code i aplikacjach Electron UI Automation jest tylko pomocą, a nie warunkiem wstawienia. Po przywróceniu aplikacji QuickCalc wysyła standardowe `Ctrl+V`. Jeśli wcześniej istniało zaznaczenie, cały wklejony wynik zostaje ponownie zaznaczony; bez zaznaczenia kursor pozostaje za wynikiem. Nieobsłużone wyjątki interfejsu są zapisywane w `quickcalc-error.log` obok programu.
 
-Tryb kontekstowy nie korzysta ze schowka, więc nie musi zapisywać ani odtwarzać cudzych formatów. Tryb schowka celowo zastępuje jego zawartość. Aplikacja uruchomiona bez podniesionych uprawnień nie może niezawodnie sterować oknem uruchomionym jako administrator. Kontrolki niestandardowe mogą nie zachować zaznaczenia po utracie fokusu; program odmawia działania względnego, jeżeli zaznaczenie nie zostało potwierdzone, ale zgodność wstawiania wymaga testu z konkretną aplikacją.
+Tryb kontekstowy korzysta ze schowka wyłącznie tymczasowo i przywraca jego wcześniejszą zawartość. Tryb schowka celowo zastępuje jego zawartość. Aplikacja uruchomiona bez podniesionych uprawnień nie może niezawodnie sterować oknem uruchomionym jako administrator. Po otwarciu popupu niektóre aplikacje przestają rysować kolor zaznaczenia, ponieważ tracą fokus; nie oznacza to usunięcia tekstu ani logicznego zakresu zaznaczenia.
 
 ## Ręczny test Altium Designer 18
 

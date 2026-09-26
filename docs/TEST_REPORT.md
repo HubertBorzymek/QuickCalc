@@ -18,15 +18,21 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
-- `QuickCalc.Core.Tests`: 35 zaliczonych, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 10 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 46 przypadków, z czego 45 zaliczonych i 1 pominięty.
+- `QuickCalc.Core.Tests`: 53 zaliczone, 0 niezaliczonych, 0 pominiętych;
+- `QuickCalc.Integration.Tests`: 12 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 66 przypadków, z czego 65 zaliczonych i 1 pominięty.
+
+Pominięty w pełnym przebiegu test wymaga wyłącznego prawa do okna pierwszoplanowego. Uruchomiony osobno (`VerifiedSelectionWithoutWin32IndexesUsesClipboardPasteFallback`) zakończył się powodzeniem: 1 zaliczony, 0 pominiętych. Potwierdza wklejenie przez `Ctrl+V` i odtworzenie schowka w kontrolce bez zapisanych indeksów Win32.
 
 Nowe testy integracyjne potwierdzają dostarczenie komunikatu `WM_HOTKEY` do okna komunikatów oraz zachowanie pierwszego skrótu po wymuszonym konflikcie rejestracji drugiego skrótu.
 
 Testy integracyjne potwierdzają także rzeczywiste pokazanie popupu i podglądu `10+5 = 15`, wykrycie dokładnego zaznaczenia standardowej kontrolki oraz pełny przepływ względny: zaznaczone `25mm`, wyrażenie `+5`, wynik i zastąpienie tekstu `30mm`. Test awaryjnego `SendInput` dla kontrolki bez indeksów Win32 został pominięty przez runner, ale ta ścieżka została dodatkowo sprawdzona na rzeczywistym polu tekstowym przeglądarki Chromium.
 
 Końcowy test przeglądarkowy wykrył właściwą przyczynę wcześniejszych odmów: zarządzana definicja unii Win32 `INPUT` była za mała w procesie x64, więc `SendInput` zwracał błąd 87. Po dodaniu największego wariantu unii rozmiar jest sprawdzany regresyjnie (`40` bajtów x64, `28` bajtów x86). Na rzeczywistym polu wyszukiwania Chromium potwierdzono dwa przepływy: zaznaczone `42345` i `+3` zostało zastąpione przez `42348`, a wyrażenie bezwzględne `5+3` w pustym polu z kursorem wstawiło `8`.
+
+Po kolejnym raporcie usunięto błędny warunek wymagający, aby dostawca UI Automation po utracie i odzyskaniu fokusu zwrócił identyczny tekst zaznaczenia. Zaznaczenie niestandardowych edytorów jest teraz dodatkowo wykrywane przez tymczasowe `Ctrl+C`, a wynik trafia do nich przez standardowe `Ctrl+V` z odtworzeniem wcześniejszego schowka. Test integracyjny wykrył i naprawił wyścig, w którym stary schowek mógł zostać przywrócony przed obsłużeniem `Ctrl+V`.
+
+Dodane regresje sprawdzają pełne zaznaczenie dłuższego wyniku, pozycję kursora po wstawieniu bez zaznaczenia, zachowanie odstępu przed jednostką, przedrostki SI i jednostki elektroniczne, potęgowanie, pierwiastek `r` oraz zatwierdzenie z konwersją SI przez `Shift+Enter` (`2cm / 500 → 0.04mm`, `5ft → 1.524m`).
 
 Po raporcie użytkownika naprawiono brak bibliotek UI Automation w publikacji, obsługę zaznaczonej liczby bez jednostki (`23` i `+3` daje `26`), interpretację wyniku Enter, przywracanie pierwszego planu oraz dźwięk systemowy Enter/Escape. Skrypt publikujący kopiuje wymagane biblioteki i uruchamia gotowy EXE z `--self-test`; publikacja jest odrzucana, jeżeli UI Automation lub względny parser nie załadują się z katalogu dystrybucyjnego.
 

@@ -14,6 +14,11 @@ internal static class NativeMethods
     internal const uint KeyeventfUnicode = 0x0004;
     internal const uint KeyeventfKeyup = 0x0002;
     internal const int InputKeyboard = 1;
+    internal const ushort VkControl = 0x11;
+    internal const ushort VkShift = 0x10;
+    internal const ushort VkC = 0x43;
+    internal const ushort VkV = 0x56;
+    internal const ushort VkLeft = 0x25;
 
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint key);
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool UnregisterHotKey(IntPtr hWnd, int id);

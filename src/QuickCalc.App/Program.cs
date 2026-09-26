@@ -14,6 +14,8 @@ static class Program
             {
                 _ = TargetContext.UiAutomationAssemblyIdentity;
                 if (new ExpressionEvaluator().Evaluate("+3", "23").Text != "26") return 3;
+                if (new ExpressionEvaluator().Evaluate("r81").Text != "9") return 4;
+                if (new ExpressionEvaluator().Evaluate("*1", "5ft", true).Text != "1.524m") return 5;
                 return 0;
             }
             catch (Exception ex)

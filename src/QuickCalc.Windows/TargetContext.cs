@@ -59,7 +59,15 @@ public sealed class TargetContext
         var info = new NativeMethods.GuiThreadInfo { cbSize = Marshal.SizeOf<NativeMethods.GuiThreadInfo>() };
         var control = NativeMethods.GetGUIThreadInfo(thread, ref info) && info.hwndFocus != IntPtr.Zero ? info.hwndFocus : window;
 
-        return CaptureForHandles(window, control);
+        var captured = CaptureForHandles(window, control);
+        if (captured.HasSelection || !TryReadSelectionByCopy(out var copiedSelection)) return captured;
+
+        AutomationElement? focusedElement = null;
+        try { focusedElement = AutomationElement.FocusedElement; }
+        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or
+                                   UnauthorizedAccessException or COMException) { }
+        return new TargetContext(window, control, null, null, copiedSelection,
+            "Ctrl+C (niezależne od UI Automation)", focusedElement, null);
     }
 
     public static TargetContext CaptureForHandles(IntPtr window, IntPtr control)
@@ -105,7 +113,7 @@ public sealed class TargetContext
 
         if (!RestoreNativeFocus()) return false;
 
-        if (_automationTarget is null || _automationRange is null)
+        if (_automationTarget is null)
         {
             if (SelectionStart is int start && SelectionEnd is int end)
                 NativeMethods.SendMessage(ControlHandle, NativeMethods.EmSetSel, (IntPtr)start, (IntPtr)end);
@@ -117,27 +125,16 @@ public sealed class TargetContext
             // Browser and Electron editors normally expose only their top-level HWND.
             // Restore the real editable child and the exact selection/caret through UIA.
             _automationTarget.SetFocus();
-            _automationRange.Select();
-
-            if (!_automationTarget.TryGetCurrentPattern(TextPattern.Pattern, out var pattern))
-            {
-                LastFailureReason = "Pole docelowe utraciło obsługę UI Automation TextPattern.";
-                return false;
-            }
-
-            var current = ((TextPattern)pattern).GetSelection();
-            if (current.Length != 1 || current[0].GetText(-1) != (SelectedText ?? string.Empty))
-            {
-                LastFailureReason = "UI Automation nie potwierdziło odtworzenia pierwotnego zaznaczenia lub kursora.";
-                return false;
-            }
+            _automationRange?.Select();
             return true;
         }
         catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or
                                    UnauthorizedAccessException or COMException)
         {
-            LastFailureReason = $"Nie udało się odtworzyć zakresu UI Automation: {ex.GetType().Name}: {ex.Message}";
-            return false;
+            // UIA is advisory. The editor can invalidate its provider while keeping
+            // its native selection, so Ctrl+V still gets a chance to work.
+            LastFailureReason = $"UI Automation nie odtworzyło zakresu ({ex.GetType().Name}); użyto zachowanego zaznaczenia.";
+            return true;
         }
     }
 
@@ -161,19 +158,46 @@ public sealed class TargetContext
 
     public bool InsertOrReplace(string value)
     {
-        if (!IsValid) return false;
-        if (SelectionStart.HasValue)
+        if (!IsValid)
         {
-            NativeMethods.SendMessage(ControlHandle, NativeMethods.EmSetSel,
-                (IntPtr)SelectionStart.Value, (IntPtr)(SelectionEnd ?? SelectionStart.Value));
+            LastFailureReason = "Okno docelowe już nie istnieje.";
+            return false;
+        }
+        if (SelectionStart is int start)
+        {
+            var end = SelectionEnd ?? start;
+            NativeMethods.SendMessage(ControlHandle, NativeMethods.EmSetSel, (IntPtr)start, (IntPtr)end);
             NativeMethods.SendMessage(ControlHandle, NativeMethods.EmReplaceSel, (IntPtr)1, value);
-            RestoreFocus();
+            var caret = start + value.Length;
+            NativeMethods.SendMessage(ControlHandle, NativeMethods.EmSetSel,
+                (IntPtr)(HasSelection ? start : caret), (IntPtr)caret);
+            RestoreNativeFocus();
             return true;
         }
         if (!RestoreFocus()) return false;
-        if (SendUnicode(value)) return true;
-        LastFailureReason = $"SendInput nie wstawił wszystkich znaków (kod Win32: {Marshal.GetLastWin32Error()}).";
-        return false;
+        try
+        {
+            using var clipboard = ClipboardSnapshot.Capture();
+            SetClipboardText(value);
+            if (!SendChord(NativeMethods.VkControl, NativeMethods.VkV))
+            {
+                LastFailureReason = $"Windows odrzucił skrót Ctrl+V (kod {Marshal.GetLastWin32Error()}).";
+                return false;
+            }
+            WaitForInjectedInput();
+            if (HasSelection && !SelectPreviousCharacters(value.Length))
+            {
+                LastFailureReason = $"Wynik wklejono, ale nie udało się zaznaczyć go w całości (kod {Marshal.GetLastWin32Error()}).";
+                return false;
+            }
+            WaitForInjectedInput();
+            return true;
+        }
+        catch (ExternalException ex)
+        {
+            LastFailureReason = $"Schowek jest chwilowo niedostępny: {ex.Message}";
+            return false;
+        }
     }
 
     private static bool TryStandardEditSelection(IntPtr control, out int start, out int end, out string? selected)
@@ -233,19 +257,118 @@ public sealed class TargetContext
         return true;
     }
 
-    private static bool SendUnicode(string text)
+    private static bool TryReadSelectionByCopy(out string selected)
     {
-        var inputs = new List<NativeMethods.Input>(text.Length * 2);
-        foreach (var character in text)
+        selected = string.Empty;
+        try
         {
-            inputs.Add(Key(character, false)); inputs.Add(Key(character, true));
+            using var clipboard = ClipboardSnapshot.Capture();
+            var marker = "QuickCalc/" + Guid.NewGuid().ToString("N");
+            SetClipboardText(marker);
+            if (!SendChord(NativeMethods.VkControl, NativeMethods.VkC)) return false;
+            for (var attempt = 0; attempt < 20; attempt++)
+            {
+                Application.DoEvents();
+                Thread.Sleep(10);
+                var value = GetClipboardText();
+                if (value == marker) continue;
+                if (!string.IsNullOrEmpty(value)) { selected = value; return true; }
+                return false;
+            }
+            return false;
         }
-        return NativeMethods.SendInput((uint)inputs.Count, [.. inputs], Marshal.SizeOf<NativeMethods.Input>()) == inputs.Count;
+        catch (ExternalException) { return false; }
     }
 
-    private static NativeMethods.Input Key(char c, bool up) => new()
+    private static bool SendChord(ushort modifier, ushort key)
+    {
+        NativeMethods.Input[] inputs = [VirtualKey(modifier, false), VirtualKey(key, false),
+            VirtualKey(key, true), VirtualKey(modifier, true)];
+        return NativeMethods.SendInput((uint)inputs.Length, inputs, NativeInputSize) == inputs.Length;
+    }
+
+    private static bool SelectPreviousCharacters(int count)
+    {
+        var inputs = new List<NativeMethods.Input>(count * 2 + 2) { VirtualKey(NativeMethods.VkShift, false) };
+        for (var i = 0; i < count; i++)
+        {
+            inputs.Add(VirtualKey(NativeMethods.VkLeft, false));
+            inputs.Add(VirtualKey(NativeMethods.VkLeft, true));
+        }
+        inputs.Add(VirtualKey(NativeMethods.VkShift, true));
+        return NativeMethods.SendInput((uint)inputs.Count, [.. inputs], NativeInputSize) == inputs.Count;
+    }
+
+    private static void WaitForInjectedInput()
+    {
+        // SendInput only queues the keys. Pumping messages matters when the target
+        // lives on this UI thread (tests and some embedded editors) and is harmless
+        // for external applications.
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            Application.DoEvents();
+            Thread.Sleep(10);
+        }
+    }
+
+    private static NativeMethods.Input VirtualKey(ushort key, bool up) => new()
     {
         type = NativeMethods.InputKeyboard,
-        union = new NativeMethods.InputUnion { keyboard = new NativeMethods.KeyboardInput { scanCode = c, flags = NativeMethods.KeyeventfUnicode | (up ? NativeMethods.KeyeventfKeyup : 0) } }
+        union = new NativeMethods.InputUnion { keyboard = new NativeMethods.KeyboardInput
+            { virtualKey = key, flags = up ? NativeMethods.KeyeventfKeyup : 0 } }
     };
+
+    private static string GetClipboardText() => RetryClipboard(() => Clipboard.ContainsText() ? Clipboard.GetText() : string.Empty);
+    private static void SetClipboardText(string value) => RetryClipboard(() => { Clipboard.SetText(value); return true; });
+    private static T RetryClipboard<T>(Func<T> action)
+    {
+        ExternalException? last = null;
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            try { return action(); }
+            catch (ExternalException ex) { last = ex; Thread.Sleep(10); }
+        }
+        throw last ?? new ExternalException("Schowek jest niedostępny.");
+    }
+
+    private sealed class ClipboardSnapshot : IDisposable
+    {
+        private readonly DataObject? _data;
+        private ClipboardSnapshot(DataObject? data) => _data = data;
+
+        public static ClipboardSnapshot Capture()
+        {
+            var source = RetryClipboard(Clipboard.GetDataObject);
+            if (source is null) return new ClipboardSnapshot(null);
+            var copy = new DataObject();
+            foreach (var format in source.GetFormats(false))
+            {
+                try
+                {
+                    var value = source.GetData(format, false);
+                    if (value is Stream stream)
+                    {
+                        var position = stream.CanSeek ? stream.Position : 0;
+                        var memory = new MemoryStream(); stream.CopyTo(memory); memory.Position = 0;
+                        if (stream.CanSeek) stream.Position = position;
+                        value = memory;
+                    }
+                    else if (value is Image image) value = image.Clone();
+                    if (value is not null) copy.SetData(format, false, value);
+                }
+                catch (Exception ex) when (ex is ExternalException or InvalidOperationException) { }
+            }
+            return new ClipboardSnapshot(copy);
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                if (_data is null) RetryClipboard(() => { Clipboard.Clear(); return true; });
+                else RetryClipboard(() => { Clipboard.SetDataObject(_data, true); return true; });
+            }
+            catch (ExternalException) { }
+        }
+    }
 }

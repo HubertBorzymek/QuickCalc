@@ -15,6 +15,18 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("3,5+1.5", null, "5")]
     [DataRow("1in+5mm", null, "1.19685039370079in")]
     [DataRow("3mm*2", null, "6mm")]
+    [DataRow("10mm/2", null, "5mm")]
+    [DataRow("10 mm/2", null, "5 mm")]
+    [DataRow("2^3^2", null, "512")]
+    [DataRow("r81", null, "9")]
+    [DataRow("√(9+7)", null, "4")]
+    [DataRow("4.7kΩ*2", null, "9.4kΩ")]
+    [DataRow("3.3V+700mV", null, "4V")]
+    [DataRow("10uF/2", null, "5µF")]
+    [DataRow("250mA*2", null, "500mA")]
+    [DataRow("20MHz/4", null, "5MHz")]
+    [DataRow("3kPa+500Pa", null, "3.5kPa")]
+    [DataRow("2kg/4", null, "0.5kg")]
     public void EvaluatesAbsoluteExpressions(string expression, string? selection, string expected)
         => Assert.AreEqual(expected, _sut.Evaluate(expression, selection).Text);
 
@@ -37,6 +49,10 @@ public sealed class ExpressionEvaluatorTests
     [TestMethod] public void AbsoluteScalarUsesSelectedUnit() => Assert.AreEqual("15mm", _sut.Evaluate("10+5", "25mm").Text);
     [TestMethod] public void NegativeWithoutSelectionIsAbsolute() => Assert.IsFalse(_sut.Evaluate("-5").IsRelative);
     [TestMethod] public void DividingLengthsProducesScalar() => Assert.AreEqual("5", _sut.Evaluate("/5mm", "25mm").Text);
+    [TestMethod] public void ConvertsSmallLengthToReadableSi() => Assert.AreEqual("0.04mm", _sut.Evaluate("/500", "2cm", true).Text);
+    [TestMethod] public void ConvertsImperialLengthToSi() => Assert.AreEqual("1.524m", _sut.Evaluate("*1", "5ft", true).Text);
+    [TestMethod] public void ConversionPreservesSelectedSpacing() => Assert.AreEqual("1.524 m", _sut.Evaluate("*1", "5 ft", true).Text);
+    [TestMethod] public void ConvertsElectronicsUnitToEngineeringPrefix() => Assert.AreEqual("4.7kΩ", _sut.Evaluate("*1", "4700Ω", true).Text);
 
     [TestMethod]
     [DataRow("+5")]
@@ -51,6 +67,8 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("3mm*2mm")]
     [DataRow("3mm+2")]
     [DataRow("abc")]
+    [DataRow("r-1")]
+    [DataRow("2mm^2")]
     public void RejectsInvalidOrUnsupportedExpressions(string expression)
         => Assert.ThrowsExactly<CalculationException>(() => _sut.Evaluate(expression));
 

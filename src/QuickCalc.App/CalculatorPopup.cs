@@ -23,13 +23,14 @@ internal sealed class CalculatorPopup : Form
     {
         _mode = mode; _target = target; _evaluator = evaluator; _history = history;
         Text = "QuickCalc"; FormBorderStyle = FormBorderStyle.FixedSingle; ShowInTaskbar = false; TopMost = true;
-        MaximizeBox = false; MinimizeBox = false; ClientSize = new Size(390, 145); Font = new Font("Segoe UI", 9F); KeyPreview = true;
-        var modeLabel = new Label { Left = 12, Top = 10, Width = 360, Height = 20, Text = mode == CalculatorMode.Context ? "TRYB KONTEKSTOWY" : "TRYB SCHOWKA", ForeColor = Color.DimGray };
-        _expression.SetBounds(12, 34, 365, 27); _expression.Font = new Font("Segoe UI", 12F);
-        _preview.SetBounds(13, 67, 364, 24); _preview.Font = new Font("Segoe UI Semibold", 11F); _preview.Text = "Wpisz wyrażenie";
-        _error.SetBounds(13, 94, 364, 20); _error.ForeColor = Color.Firebrick;
+        MaximizeBox = false; MinimizeBox = false; ClientSize = new Size(460, 145); Font = new Font("Segoe UI", 9F); KeyPreview = true;
+        var modeLabel = new Label { Left = 12, Top = 10, Width = 430, Height = 20, Text = mode == CalculatorMode.Context ? "TRYB KONTEKSTOWY" : "TRYB SCHOWKA", ForeColor = Color.DimGray };
+        _expression.SetBounds(12, 34, 435, 27); _expression.Font = new Font("Segoe UI", 12F);
+        _preview.SetBounds(13, 67, 434, 24); _preview.Font = new Font("Segoe UI Semibold", 11F); _preview.Text = "Wpisz wyrażenie";
+        _error.SetBounds(13, 94, 434, 20); _error.ForeColor = Color.Firebrick;
         var selection = target.HasSelection ? $"Zaznaczenie: {Shorten(target.SelectedText!)}" : "Brak wykrytego zaznaczenia";
-        var hint = new Label { Left = 13, Top = 119, Width = 364, Height = 18, ForeColor = Color.Gray, Text = $"{selection}  •  Enter: zatwierdź  •  Esc: anuluj" };
+        var hint = new Label { Left = 13, Top = 119, Width = 434, Height = 18, ForeColor = Color.Gray,
+            Text = $"{selection}  •  Enter: wynik  •  Shift+Enter: SI  •  Esc" };
         Controls.AddRange([modeLabel, _expression, _preview, _error, hint]);
         _expression.TextChanged += (_, _) => { if (!_historyNavigation) _history.ResetNavigation(); _historyNavigation = false; RefreshPreview(); };
         _expression.KeyDown += ExpressionKeyDown;
@@ -62,15 +63,9 @@ internal sealed class CalculatorPopup : Form
             Finish(new(_mode, true));
             return true;
         }
-        if (keyData == Keys.Enter)
+        if ((keyData & Keys.KeyCode) == Keys.Enter)
         {
-            try
-            {
-                var result = _evaluator.Evaluate(_expression.Text, _mode == CalculatorMode.Context ? _target.SelectedText : null);
-                _history.Add(_expression.Text);
-                Finish(new(_mode, false, result.Text));
-            }
-            catch (CalculationException ex) { ShowOperationError(ex.Message); }
+            Submit((keyData & Keys.Shift) == Keys.Shift);
             return true;
         }
         return base.ProcessCmdKey(ref msg, keyData);
@@ -82,6 +77,18 @@ internal sealed class CalculatorPopup : Form
         _historyNavigation = true; _expression.Text = value; _historyNavigation = true; _expression.SelectionStart = _expression.TextLength;
     }
 
+    internal void Submit(bool convertToSi)
+    {
+        try
+        {
+            var result = _evaluator.Evaluate(_expression.Text,
+                _mode == CalculatorMode.Context ? _target.SelectedText : null, convertToSi);
+            _history.Add(_expression.Text);
+            Finish(new(_mode, false, result.Text));
+        }
+        catch (CalculationException ex) { ShowOperationError(ex.Message); }
+    }
+
     private void Finish(PopupOperation operation) { if (_completionRaised) return; _completionRaised = true; OperationFinished?.Invoke(this, operation); }
 
     public void ShowOperationError(string message) { _completionRaised = false; Show(); Activate(); _expression.Focus(); _error.Text = message; }
@@ -89,7 +96,11 @@ internal sealed class CalculatorPopup : Form
     public void MoveToCurrentCursorScreen()
     {
         var area = Screen.FromPoint(Cursor.Position).WorkingArea;
-        var point = new Point(Cursor.Position.X + 16, Cursor.Position.Y + 20);
+        const int margin = 32;
+        var x = Cursor.Position.X + margin + Width <= area.Right
+            ? Cursor.Position.X + margin
+            : Cursor.Position.X - margin - Width;
+        var point = new Point(x, Cursor.Position.Y - 36);
         point.X = Math.Clamp(point.X, area.Left, area.Right - Width); point.Y = Math.Clamp(point.Y, area.Top, area.Bottom - Height); Location = point;
     }
     private static string Shorten(string value) => value.Length <= 24 ? value : value[..21] + "…";

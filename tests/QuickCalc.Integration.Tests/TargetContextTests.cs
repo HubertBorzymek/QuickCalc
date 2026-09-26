@@ -52,6 +52,7 @@ public sealed class TargetContextTests
                 Assert.IsTrue(target.InsertOrReplace("15mm"));
                 Application.DoEvents();
                 Assert.AreEqual("Position: 15mm", box.Text);
+                Assert.AreEqual("15mm", box.SelectedText);
             }
             catch (Exception ex) { failure = ex; }
             finally { completed.Set(); }
@@ -74,6 +75,7 @@ public sealed class TargetContextTests
             Assert.IsTrue(target.InsertOrReplace(result.Text));
             Application.DoEvents();
             Assert.AreEqual("Value: 30mm", box.Text);
+            Assert.AreEqual("30mm", box.SelectedText);
         });
     }
 
@@ -89,11 +91,27 @@ public sealed class TargetContextTests
             Assert.IsTrue(target.InsertOrReplace(result.Text));
             Application.DoEvents();
             Assert.AreEqual("Value: 26", box.Text);
+            Assert.AreEqual("26", box.SelectedText);
         });
     }
 
     [TestMethod]
-    public void VerifiedSelectionWithoutWin32IndexesUsesUnicodeFallback()
+    public void InsertionWithoutSelectionLeavesCaretAfterResult()
+    {
+        RunStaWithFocusedTextBox("Value: ", 7, 0, (form, box) =>
+        {
+            var target = TargetContext.CaptureForHandles(form.Handle, box.Handle);
+            Assert.IsFalse(target.HasSelection);
+            Assert.IsTrue(target.InsertOrReplace("1234"));
+            Application.DoEvents();
+            Assert.AreEqual("Value: 1234", box.Text);
+            Assert.AreEqual(11, box.SelectionStart);
+            Assert.AreEqual(0, box.SelectionLength);
+        });
+    }
+
+    [TestMethod]
+    public void VerifiedSelectionWithoutWin32IndexesUsesClipboardPasteFallback()
     {
         RunStaWithFocusedTextBox("Value: 25mm", 7, 4, (form, box) =>
         {
