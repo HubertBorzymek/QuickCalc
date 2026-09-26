@@ -17,7 +17,6 @@ internal static class NativeMethods
     internal const uint SmtoAbortIfHung = 0x0002;
     internal const int InputKeyboard = 1;
     internal const ushort VkControl = 0x11;
-    internal const ushort VkC = 0x43;
     internal const ushort VkV = 0x56;
 
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint key);

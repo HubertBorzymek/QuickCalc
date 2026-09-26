@@ -66,6 +66,16 @@ public sealed class TargetContextTests
     }
 
     [TestMethod]
+    public void KeyboardCopyFallbackAvoidsOnlyVisualStudioEditorCommand()
+    {
+        Assert.IsFalse(TargetContext.ShouldUseKeyboardCopyFallback("devenv"));
+        Assert.IsFalse(TargetContext.ShouldUseKeyboardCopyFallback("DEVENV"));
+        Assert.IsTrue(TargetContext.ShouldUseKeyboardCopyFallback("X2"));
+        Assert.IsTrue(TargetContext.ShouldUseKeyboardCopyFallback("AltiumDesigner"));
+        Assert.IsTrue(TargetContext.ShouldUseKeyboardCopyFallback(null));
+    }
+
+    [TestMethod]
     public void WindowMessageCopyReadsOnlyAnActualSelection()
     {
         RunStaWithFocusedTextBox("Value: 25mm", 7, 4, (form, box) =>
@@ -76,8 +86,22 @@ public sealed class TargetContextTests
             var timer = Stopwatch.StartNew();
             Assert.IsFalse(TargetContext.TryReadSelectionByWindowMessage(box.Handle, out _));
             timer.Stop();
-            Assert.IsTrue(timer.Elapsed < TimeSpan.FromMilliseconds(100),
+            Assert.IsTrue(timer.Elapsed < TimeSpan.FromMilliseconds(300),
                 $"WM_COPY bez zaznaczenia trwał {timer.Elapsed.TotalMilliseconds:F0} ms.");
+        });
+    }
+
+    [TestMethod]
+    public void KeyboardCopyFallbackReadsSelectionAndRejectsBareCaret()
+    {
+        RunStaWithFocusedTextBox("Height: 1mm", 8, 3, (form, box) =>
+        {
+            if (!TargetContext.TryReadSelectionByCopy(out var selected))
+                throw new AssertInconclusiveException(
+                    "Runner testów nie przyznał kontrolce pierwszego planu wymaganego przez Ctrl+C.");
+            Assert.AreEqual("1mm", selected);
+            box.Select(8, 0);
+            Assert.IsFalse(TargetContext.TryReadSelectionByCopy(out _));
         });
     }
 

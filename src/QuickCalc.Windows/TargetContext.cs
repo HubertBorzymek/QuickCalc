@@ -3,6 +3,7 @@ using System.Text;
 using System.Windows.Automation;
 using System.Windows.Automation.Text;
 using QuickCalc.Core;
+using System.Diagnostics;
 
 namespace QuickCalc.Windows;
 
@@ -84,11 +85,15 @@ public sealed class TargetContext
         // Visual Studio can serialize Ctrl+C behind a busy editor operation and
         // display a long "wait for an editor command" dialog. Use the clipboard
         // probe only when UIA positively reported a non-degenerate range.
-        if (!ShouldProbeClipboard(captured.HasSelection, captured._automationIndicatedSelection) ||
+        var processName = GetProcessName(window);
+        var allowKeyboardCopy = ShouldProbeClipboard(captured.HasSelection, captured._automationIndicatedSelection) ||
+                                ShouldUseKeyboardCopyFallback(processName);
+        if (!allowKeyboardCopy ||
             !TryReadSelectionByCopy(out var copiedSelection)) return captured;
 
         return new TargetContext(window, control, null, null, copiedSelection,
-            "Ctrl+C po potwierdzeniu zakresu przez UI Automation", captured._automationTarget, null, true,
+            $"Ctrl+C klawiatury (fallback; proces={processName ?? "nieznany"})",
+            captured._automationTarget, null, true,
             captured.TargetBounds);
     }
 
@@ -121,6 +126,22 @@ public sealed class TargetContext
 
     internal static bool ShouldProbeClipboard(bool hasSelection, bool automationIndicatedSelection) =>
         !hasSelection && automationIndicatedSelection;
+
+    internal static bool ShouldUseKeyboardCopyFallback(string? processName) =>
+        !string.Equals(processName, "devenv", StringComparison.OrdinalIgnoreCase);
+
+    private static string? GetProcessName(IntPtr window)
+    {
+        try
+        {
+            NativeMethods.GetWindowThreadProcessId(window, out var processId);
+            return processId == 0 ? null : Process.GetProcessById((int)processId).ProcessName;
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
 
     public static TargetContext CaptureBasic(string reason)
     {
@@ -396,9 +417,22 @@ public sealed class TargetContext
         return true;
     }
 
-    private static bool TryReadSelectionByCopy(out string selected)
+    internal static bool TryReadSelectionByCopy(out string selected)
         => TryReadSelectionFromClipboardAction(
-            () => SendChord(NativeMethods.VkControl, NativeMethods.VkC), 4, 5, out selected);
+            SendCopyShortcut, 6, 5, out selected);
+
+    private static bool SendCopyShortcut()
+    {
+        try
+        {
+            System.Windows.Forms.SendKeys.SendWait("^c");
+            return true;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            return false;
+        }
+    }
 
     internal static bool TryReadSelectionByWindowMessage(IntPtr control, out string selected)
         => TryReadSelectionFromClipboardAction(
