@@ -15,8 +15,9 @@ public sealed class ExpressionEvaluator
         if (relative && selection is null)
             throw new CalculationException("Działanie względne wymaga zaznaczonej wartości liczbowej.");
 
-        var parser = new Parser(relative ? "0" + trimmed : trimmed, relative, selection);
-        var value = relative ? parser.ApplyRelativeSeed(selection!.Value) : parser.Parse();
+        var parserText = relative ? ExpandRelativeExpression(trimmed) : trimmed;
+        var parser = new Parser(parserText, relative, selection, selection?.Value);
+        var value = parser.Parse();
         if (!relative && value.Dimension == Dimension.Scalar && parser.FirstUnit is null && selection?.Unit is not null)
         {
             var selectedUnit = Units.Resolve(selection.Unit);
@@ -38,10 +39,16 @@ public sealed class ExpressionEvaluator
 
     private static bool IsRelative(string text, bool hasSelection)
     {
-        if (text.Length == 0 || text[0] is not ('+' or '-' or '*' or '/')) return false;
+        if (text.Length == 0) return false;
+        if (hasSelection && text[0] is 'r' or '√')
+            return text.Length == 1 || text[1] is '+' or '-' or '*' or '/' or '^' || char.IsWhiteSpace(text[1]);
+        if (text[0] is not ('+' or '-' or '*' or '/' or '^')) return false;
         if (text[0] == '-' && !hasSelection) return false;
         return true;
     }
+
+    private static string ExpandRelativeExpression(string text) =>
+        text[0] is 'r' or '√' ? text[0] + "@" + text[1..] : "@" + text;
 
     private static string Format(double value)
     {
@@ -54,10 +61,9 @@ public sealed class ExpressionEvaluator
         if (!double.IsFinite(value)) throw new CalculationException("Przepełnienie matematyczne.");
     }
 
-    private sealed class Parser(string text, bool relative, ParsedSelection? selection)
+    private sealed class Parser(string text, bool relative, ParsedSelection? selection, Quantity? relativeSeed)
     {
         private int _position;
-        private Quantity? _relativeSeed;
         public string? FirstUnit { get; private set; }
         public bool FirstUnitHadSpace { get; private set; }
 
@@ -67,34 +73,6 @@ public sealed class ExpressionEvaluator
             SkipWhite();
             if (_position != text.Length) throw Error("Nieobsługiwana składnia");
             return value;
-        }
-
-        public Quantity ApplyRelativeSeed(Quantity seed)
-        {
-            _relativeSeed = seed;
-            _position = 0;
-            return ParseSeeded();
-        }
-
-        private Quantity ParseSeeded()
-        {
-            SkipWhite();
-            if (text[_position++] != '0') throw Error("Błąd działania względnego");
-            SkipWhite();
-            if (_position >= text.Length) throw Error("Niepełne wyrażenie");
-            var initial = text[_position++];
-            var right = ParseMultiplyDivide();
-            var result = Apply(initial, _relativeSeed!.Value, right);
-            while (true)
-            {
-                SkipWhite();
-                if (!Take('+') && !Take('-')) break;
-                var op = text[_position - 1];
-                result = Apply(op, result, ParseMultiplyDivide());
-            }
-            SkipWhite();
-            if (_position != text.Length) throw Error("Nieobsługiwana składnia");
-            return result;
         }
 
         private Quantity ParseAddSubtract()
@@ -150,6 +128,7 @@ public sealed class ExpressionEvaluator
         private Quantity ParsePrimary()
         {
             SkipWhite();
+            if (Take('@')) return relativeSeed ?? throw Error("Brak zaznaczonej wartości");
             if (Take('('))
             {
                 var value = ParseAddSubtract();

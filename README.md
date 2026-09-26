@@ -8,7 +8,9 @@ Wybrano C# z Windows Forms. W porównaniu z natywnym C++ daje prostsze testowani
 
 ## Uruchamianie
 
-Najprościej uruchomić `Start-QuickCalc.ps1`. Skrypt użyje opublikowanej aplikacji, jeśli istnieje, albo uruchomi projekt poleceniem `dotnet run`. Po starcie ikona QuickCalc jest widoczna w zasobniku systemowym.
+Najprościej dwukrotnie kliknąć `Start-QuickCalc.cmd`. Plik uruchamia gotową aplikację z `artifacts\publish`, niezależnie od bieżącego katalogu roboczego. Po starcie ikona QuickCalc jest widoczna w zasobniku systemowym. Deweloperski `Start-QuickCalc.ps1` dodatkowo potrafi uruchomić projekt przez `dotnet run`, gdy publikacja jeszcze nie istnieje.
+
+Aby uruchamiać QuickCalc przy logowaniu do Windows, dwukrotnie kliknij `Install-QuickCalc-Autostart.cmd`. Tworzy on skrót `QuickCalc.lnk` w folderze Autostart bieżącego użytkownika; skrót wskazuje na `Start-QuickCalc.cmd`, więc przenoszenie samego pliku do folderu Autostart nie jest potrzebne.
 
 W Visual Studio 2026:
 
@@ -38,13 +40,13 @@ Menu ikony zawiera również osobne polecenia otwierające oba tryby bez użycia
 
 ## Wyrażenia i jednostki
 
-Obsługiwane są `+`, `-`, `*`, `/`, potęgowanie `^`, nawiasy, znaki jednoargumentowe, kropka i przecinek dziesiętny. Pierwiastek kwadratowy zapisuje się krótko jako `r`, np. `r81` albo `r(9+7)`; akceptowany jest również znak `√`.
+Obsługiwane są `+`, `-`, `*`, `/`, potęgowanie `^`, nawiasy, znaki jednoargumentowe, kropka i przecinek dziesiętny. Pierwiastek kwadratowy zapisuje się krótko jako `r`, np. `r81` albo `r(9+7)`; akceptowany jest również znak `√`. Dla zaznaczonej liczby `^2` podnosi ją do kwadratu, samo `r` ją pierwiastkuje, a dalsze działania można dopisać normalnie, np. zaznaczone `81` i `r*2+1` daje `19`.
 
 Parser obsługuje jednostki bazowe SI i ich przedrostki (m.in. `m`, `kg`, `s`, `A`, `K`, `mol`, `cd`) oraz jednostki używane w elektronice i technice: `V`, `Ω`/`ohm`, `F`, `H`, `Hz`, `W`, `N`, `Pa`, `J`, `C`, `S`, `Wb`, `T`. Dostępne są również `in`/`inch`, `ft`, `yd`, `mi`, `mil`, `min` i `h`. Przedrostek `u` jest przyjmowany jako łatwy do wpisania odpowiednik `µ`.
 
 Spacja przed jednostką jest zachowywana: `10mm/2` daje `5mm`, natomiast `10 mm/2` daje `5 mm`. `Enter` zachowuje jednostkę wejściową, a `Shift+Enter` dobiera czytelną jednostkę SI, np. zaznaczone `2cm` i `/500` daje `0.04mm`, zaś `5ft` i `*1` daje `1.524m`.
 
-Wyrażenie zaczynające się od operatora jest względne względem prawidłowo zaznaczonej liczby. Wyjątkiem jest `-5` bez zaznaczenia, które oznacza liczbę ujemną. Przykłady: zaznaczone `25mm` i `+5` daje `30mm`; `1in+5mm` daje wynik w calach. Mnożenie dwóch długości i inne nieobsługiwane wymiary są odrzucane.
+Wyrażenie zaczynające się od operatora jest względne względem prawidłowo zaznaczonej liczby; dotyczy to również `^`. Samo `r`/`√` albo pierwiastek z następującym działaniem również używa zaznaczenia. Wyjątkiem jest `-5` bez zaznaczenia, które oznacza liczbę ujemną. Przykłady: zaznaczone `25mm` i `+5` daje `30mm`; `1in+5mm` daje wynik w calach. Potęgowanie i pierwiastkowanie wielkości z jednostkami pozostaje odrzucane, ponieważ wynik wymagałby obsługi jednostek złożonych.
 
 ## Zmiana skrótów
 
@@ -66,7 +68,7 @@ Publikacja samowystarczalna dla Windows x64 trafia do `artifacts/publish`. Nie j
 
 Standardowe kontrolki Edit/RichEdit są obsługiwane bezpośrednio przez `EM_GETSEL`, `EM_SETSEL` i `EM_REPLACESEL`. Dla innych kontrolek aplikacja najpierw korzysta z UI Automation TextPattern. Chwilowe `Ctrl+C` jest używane tylko wtedy, gdy UI Automation potwierdzi niezerowy zakres, ale nie zwróci jego treści — nigdy w zwykłym trybie bez zaznaczenia. Wynik jest wstawiany jak przez `Ctrl+V`; wcześniejsza zawartość i formaty schowka są odtwarzane po operacji.
 
-W przeglądarkach, VS Code i aplikacjach Electron UI Automation jest tylko pomocą, a nie warunkiem wstawienia. QuickCalc nie próbuje ponownie aktywować zapamiętanego zakresu UI Automation po zmianie fokusu, ponieważ niektóre przeglądarki unieważniają taki zakres i mogłyby zmienić zawartość pola. Po przywróceniu aplikacji wysyłane jest standardowe `Ctrl+V`. Jeśli wcześniej istniało zaznaczenie, cały wklejony wynik zostaje ponownie zaznaczony; bez zaznaczenia kursor pozostaje za wynikiem. Nieobsłużone wyjątki interfejsu są zapisywane w `quickcalc-error.log` obok programu.
+W przeglądarkach, VS Code i aplikacjach Electron UI Automation jest tylko pomocą, a nie warunkiem wstawienia. QuickCalc nie próbuje ponownie aktywować zapamiętanego zaznaczonego zakresu UI Automation po zmianie fokusu, ponieważ niektóre przeglądarki unieważniają taki zakres i mogłyby zmienić zawartość pola. Może natomiast przywrócić pusty zakres kursora, aby kontrolka wybierająca całą zawartość po odzyskaniu fokusu nie nadpisała starego tekstu. Następnie wysyłane jest standardowe `Ctrl+V`. Jeśli wcześniej istniało zaznaczenie, cały wklejony wynik zostaje ponownie zaznaczony; bez zaznaczenia kursor pozostaje za wynikiem. Nieobsłużone wyjątki interfejsu są zapisywane w `quickcalc-error.log` obok programu.
 
 Tryb kontekstowy korzysta ze schowka wyłącznie tymczasowo i przywraca jego wcześniejszą zawartość. Tryb schowka celowo zastępuje jego zawartość. Aplikacja uruchomiona bez podniesionych uprawnień nie może niezawodnie sterować oknem uruchomionym jako administrator. Po otwarciu popupu niektóre aplikacje przestają rysować kolor zaznaczenia, ponieważ tracą fokus; nie oznacza to usunięcia tekstu ani logicznego zakresu zaznaczenia.
 

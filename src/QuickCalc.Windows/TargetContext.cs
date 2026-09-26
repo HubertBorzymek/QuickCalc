@@ -10,6 +10,7 @@ public sealed class TargetContext
 {
     private static int _automationProbeInFlight;
     private readonly AutomationElement? _automationTarget;
+    private readonly TextPatternRange? _automationCaretRange;
     private readonly bool _automationIndicatedSelection;
 
     public TargetContext(
@@ -21,7 +22,7 @@ public sealed class TargetContext
         string detectionMethod,
         Rectangle? targetBounds = null)
         : this(windowHandle, controlHandle, selectionStart, selectionEnd, selectedText, detectionMethod,
-            null, false, targetBounds)
+            null, null, false, targetBounds)
     {
     }
 
@@ -33,6 +34,7 @@ public sealed class TargetContext
         string? selectedText,
         string detectionMethod,
         AutomationElement? automationTarget,
+        TextPatternRange? automationCaretRange,
         bool automationIndicatedSelection,
         Rectangle? targetBounds)
     {
@@ -43,6 +45,7 @@ public sealed class TargetContext
         SelectedText = selectedText;
         DetectionMethod = detectionMethod;
         _automationTarget = automationTarget;
+        _automationCaretRange = automationCaretRange;
         _automationIndicatedSelection = automationIndicatedSelection;
         TargetBounds = targetBounds;
     }
@@ -75,7 +78,7 @@ public sealed class TargetContext
             !TryReadSelectionByCopy(out var copiedSelection)) return captured;
 
         return new TargetContext(window, control, null, null, copiedSelection,
-            "Ctrl+C po potwierdzeniu zakresu przez UI Automation", captured._automationTarget, true,
+            "Ctrl+C po potwierdzeniu zakresu przez UI Automation", captured._automationTarget, null, true,
             captured.TargetBounds);
     }
 
@@ -90,7 +93,8 @@ public sealed class TargetContext
                 out var automationIndicatedSelection);
             if (automationStatus == AutomationProbeStatus.Success)
                 return new TargetContext(window, control, null, null, text, "UI Automation TextPattern",
-                    automationTarget, automationIndicatedSelection, automationBounds ?? GetNativeBounds(control));
+                    automationTarget, automationIndicatedSelection ? null : automationRange,
+                    automationIndicatedSelection, automationBounds ?? GetNativeBounds(control));
             var method = automationStatus == AutomationProbeStatus.Timeout
                 ? "limit czasu UI Automation — pominięto analizę"
                 : "brak wiarygodnej detekcji";
@@ -141,15 +145,16 @@ public sealed class TargetContext
         try
         {
             // Browser and Electron editors normally expose only their top-level HWND.
-            // Restore the real editable child, but never re-use the captured
-            // TextPatternRange. Providers can invalidate or reinterpret that COM
-            // range after focus changes (Opera could consequently clear its field).
-            // The editor itself preserves the native selection used by Ctrl+V.
+            // Restore the editable child. A non-degenerate (selected) range is
+            // deliberately never re-used because Opera can invalidate it and clear
+            // the field. A degenerate range is only a caret position and prevents
+            // controls such as Altium fields from selecting all on focus return.
             _automationTarget.SetFocus();
+            _automationCaretRange?.Select();
             return true;
         }
         catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or
-                                   UnauthorizedAccessException or COMException)
+                                   UnauthorizedAccessException or COMException or ArgumentException)
         {
             // UIA is advisory. The editor can invalidate its provider while keeping
             // its native selection, so Ctrl+V still gets a chance to work.
@@ -222,15 +227,28 @@ public sealed class TargetContext
     private static bool TryStandardEditSelection(IntPtr control, out int start, out int end, out string? selected)
     {
         start = end = 0; selected = null;
+        if (control == IntPtr.Zero) return false;
         var className = new StringBuilder(128);
         NativeMethods.GetClassName(control, className, className.Capacity);
-        if (!className.ToString().Contains("Edit", StringComparison.OrdinalIgnoreCase)) return false;
-        NativeMethods.SendMessage(control, NativeMethods.EmGetSel, ref start, ref end);
+        var classText = className.ToString();
+        var knownEditable = classText.Contains("Edit", StringComparison.OrdinalIgnoreCase) ||
+                            classText.Contains("TextBox", StringComparison.OrdinalIgnoreCase) ||
+                            classText.Contains("Scintilla", StringComparison.OrdinalIgnoreCase);
+        if (NativeMethods.SendMessageTimeout(control, NativeMethods.EmGetSel, ref start, ref end,
+                NativeMethods.SmtoAbortIfHung, 10, out _) == IntPtr.Zero) return false;
+        if (!knownEditable && end <= start) return false;
+        if (NativeMethods.SendMessageTimeout(control, NativeMethods.WmGetTextLength, IntPtr.Zero, IntPtr.Zero,
+                NativeMethods.SmtoAbortIfHung, 10, out var lengthResult) == IntPtr.Zero) return false;
+        var length = lengthResult.ToInt32();
+        // Some CAD/framework controls implement the Edit message contract despite
+        // a custom class name. A non-zero valid range proves that contract without
+        // maintaining an application-specific class list.
+        if (!knownEditable && (length <= 0 || end > length)) return false;
         if (end <= start) return true;
-        var length = NativeMethods.SendMessage(control, NativeMethods.WmGetTextLength, IntPtr.Zero, IntPtr.Zero).ToInt32();
-        if (length <= 0 || end > length) return true;
+        if (length <= 0 || end > length) return knownEditable;
         var buffer = new StringBuilder(length + 1);
-        NativeMethods.SendMessage(control, NativeMethods.WmGetText, (IntPtr)buffer.Capacity, buffer);
+        if (NativeMethods.SendMessageTimeout(control, NativeMethods.WmGetText, (IntPtr)buffer.Capacity, buffer,
+                NativeMethods.SmtoAbortIfHung, 10, out _) == IntPtr.Zero) return knownEditable;
         selected = buffer.ToString(start, end - start);
         return true;
     }
@@ -296,14 +314,17 @@ public sealed class TargetContext
         {
             // Browser/Electron address bars and editors often share a top-level HWND.
             // The globally focused UIA element identifies the actual editable child.
-            var element = AutomationElement.FocusedElement;
-            if (!TryGetTextSelection(element, out selected, out automationRange, out automationIndicatedSelection))
+            var focusedElement = AutomationElement.FocusedElement;
+            if (!TryGetTextSelectionFromElementOrAncestors(focusedElement, out selected, out automationRange,
+                    out automationIndicatedSelection, out var patternElement))
             {
-                element = AutomationElement.FromHandle(control);
-                if (!TryGetTextSelection(element, out selected, out automationRange,
-                        out automationIndicatedSelection)) return false;
+                var handleElement = AutomationElement.FromHandle(control);
+                if (!TryGetTextSelectionFromElementOrAncestors(handleElement, out selected, out automationRange,
+                        out automationIndicatedSelection, out patternElement)) return false;
             }
-            automationTarget = element;
+            // Refocus the original editable descendant when possible; the range may
+            // legitimately be exposed only by one of its document ancestors.
+            automationTarget = focusedElement ?? patternElement;
             return true;
         }
         catch (ElementNotAvailableException) { return false; }
@@ -311,6 +332,40 @@ public sealed class TargetContext
         catch (UnauthorizedAccessException) { return false; }
         catch (COMException) { return false; }
         catch (ArgumentException) { return false; }
+    }
+
+    private static bool TryGetTextSelectionFromElementOrAncestors(
+        AutomationElement? element,
+        out string? selected,
+        out TextPatternRange? selectionRange,
+        out bool indicatedSelection,
+        out AutomationElement? patternElement)
+    {
+        selected = null; selectionRange = null; indicatedSelection = false; patternElement = null;
+        TextPatternRange? caretFallback = null;
+        AutomationElement? caretElement = null;
+        for (var depth = 0; element is not null && depth < 7; depth++)
+        {
+            if (TryGetTextSelection(element, out var candidateText, out var candidateRange,
+                    out var candidateIndicated))
+            {
+                if (candidateIndicated || !string.IsNullOrEmpty(candidateText))
+                {
+                    selected = candidateText;
+                    selectionRange = candidateRange;
+                    indicatedSelection = candidateIndicated;
+                    patternElement = element;
+                    return true;
+                }
+                caretFallback ??= candidateRange;
+                caretElement ??= element;
+            }
+            element = TreeWalker.ControlViewWalker.GetParent(element);
+        }
+        if (caretFallback is null) return false;
+        selectionRange = caretFallback;
+        patternElement = caretElement;
+        return true;
     }
 
     private static bool TryGetTextSelection(

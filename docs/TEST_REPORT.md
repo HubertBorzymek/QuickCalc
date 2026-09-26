@@ -18,9 +18,9 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
-- `QuickCalc.Core.Tests`: 53 zaliczone, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 16 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 70 przypadków, z czego 69 zaliczonych i 1 pominięty.
+- `QuickCalc.Core.Tests`: 62 zaliczone, 0 niezaliczonych, 0 pominiętych;
+- `QuickCalc.Integration.Tests`: 17 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 80 przypadków, z czego 79 zaliczonych i 1 pominięty.
 
 Pominięty w pełnym przebiegu test wymaga wyłącznego prawa do okna pierwszoplanowego. Uruchomiony osobno (`VerifiedSelectionWithoutWin32IndexesUsesClipboardPasteFallback`) zakończył się powodzeniem: 1 zaliczony, 0 pominiętych. Potwierdza wklejenie przez `Ctrl+V` i odtworzenie schowka w kontrolce bez zapisanych indeksów Win32.
 
@@ -40,6 +40,8 @@ Po regresjach w VS Code i pasku adresu Opery usunięto ponowne używanie zapami�
 
 Po wykryciu blokującego polecenia kopiowania w Visual Studio tryb bez zaznaczenia nie uruchamia już awaryjnego `Ctrl+C`. Próba schowka jest dopuszczona wyłącznie wtedy, gdy UI Automation jednoznacznie zgłosi niezerową długość zakresu, lecz nie zwróci jego treści. Regresja tej decyzji jest objęta osobnym testem.
 
+Po testach aplikacji GPT i pól Altium wyszukiwanie wzorca tekstowego objęło także nadrzędne kontenery aktywnego elementu. Kontrolki realizujące protokół komunikatów Win32 Edit są wykrywane również przy niestandardowej nazwie klasy, z limitami czasu chroniącymi przed zawieszonym oknem. Zaznaczone `-18.3mm` i wynik bez jednostki zachowuje `mm`. Dla braku zaznaczenia zapamiętany pusty zakres UI Automation odtwarza pozycję kursora po powrocie fokusu, ale zakres zawierający zaznaczenie nadal nie jest ponownie aktywowany ze względu na błąd Opery. Parser względny obsługuje teraz `^2`, samo `r`/`√` oraz dalsze działania, np. `81` z `r*2+1` daje `19`.
+
 Po raporcie użytkownika naprawiono brak bibliotek UI Automation w publikacji, obsługę zaznaczonej liczby bez jednostki (`23` i `+3` daje `26`), interpretację wyniku Enter, przywracanie pierwszego planu oraz dźwięk systemowy Enter/Escape. Skrypt publikujący kopiuje wymagane biblioteki i uruchamia gotowy EXE z `--self-test`; publikacja jest odrzucana, jeżeli UI Automation lub względny parser nie załadują się z katalogu dystrybucyjnego.
 
 Po wykryciu `TypeLoadException` usunięto niezgodne biblioteki GAC .NET Framework 4.0. Projekt korzysta teraz z oficjalnego `Microsoft.WindowsDesktop.App.WPF` dla .NET 9. Publikacja zawiera `UIAutomationClient` i `UIAutomationTypes` w wersji 9.0.0.0; suma biblioteki klienckiej została porównana z pakietem runtime .NET 9 i była identyczna.
@@ -49,6 +51,8 @@ Test konfliktów wykonany również bez uruchomionego QuickCalc wykazał błąd 
 Pominięty test otwiera rzeczywistą kontrolkę WinForms i wymaga przyznania fokusu pierwszoplanowego. Bieżąca sesja testowa nie udostępniła aplikacji natywnych warstwie automatyzacji i Windows nie przyznał fokusu oknu procesu testowego. Nie jest to raportowane jako pozytywna weryfikacja GUI.
 
 Samowystarczalna publikacja x64 została utworzona, a `QuickCalc.App.exe` uruchomił się i pozostawał aktywny podczas testu dymnego.
+
+Plik `Start-QuickCalc.cmd` został sprawdzony jako niezależny launcher gotowej publikacji: uruchomił właściwy EXE z poprawnym katalogiem roboczym. Ponowne uruchomienie zakończyło proces pomocniczy i pozostawiło jedną instancję. `Install-QuickCalc-Autostart.cmd` tworzy skrót użytkownika wskazujący na ten sam launcher.
 
 ## Niezweryfikowane automatycznie
 

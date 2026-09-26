@@ -13,6 +13,7 @@ internal static class NativeMethods
     internal const int WmGetTextLength = 0x000E;
     internal const uint KeyeventfUnicode = 0x0004;
     internal const uint KeyeventfKeyup = 0x0002;
+    internal const uint SmtoAbortIfHung = 0x0002;
     internal const int InputKeyboard = 1;
     internal const ushort VkControl = 0x11;
     internal const ushort VkC = 0x43;
@@ -37,6 +38,15 @@ internal static class NativeMethods
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr SendMessage(IntPtr hWnd, int msg, ref int wParam, ref int lParam);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, StringBuilder lParam);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] internal static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern IntPtr SendMessageTimeout(IntPtr hWnd, int msg, ref int wParam, ref int lParam,
+        uint flags, uint timeout, out IntPtr result);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern IntPtr SendMessageTimeout(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam,
+        uint flags, uint timeout, out IntPtr result);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern IntPtr SendMessageTimeout(IntPtr hWnd, int msg, IntPtr wParam, StringBuilder lParam,
+        uint flags, uint timeout, out IntPtr result);
     [DllImport("user32.dll", SetLastError = true)] internal static extern uint SendInput(uint count, Input[] inputs, int size);
 
     [StructLayout(LayoutKind.Sequential)] internal struct GuiThreadInfo

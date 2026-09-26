@@ -43,10 +43,18 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("+5", "3 mm", "8 mm")]
     [DataRow("+3", "23", "26")]
     [DataRow("*2", "12.5", "25")]
+    [DataRow("^2", "32", "1024")]
+    [DataRow("^2+3", "32", "1027")]
+    [DataRow("r", "81", "9")]
+    [DataRow("r+7", "81", "16")]
+    [DataRow("r*2+1", "81", "19")]
+    [DataRow("√/3", "81", "3")]
     public void EvaluatesRelativeExpressions(string expression, string selection, string expected)
         => Assert.AreEqual(expected, _sut.Evaluate(expression, selection).Text);
 
     [TestMethod] public void AbsoluteScalarUsesSelectedUnit() => Assert.AreEqual("15mm", _sut.Evaluate("10+5", "25mm").Text);
+    [TestMethod] public void AbsoluteScalarReplacesNegativeSelectionAndKeepsItsUnit() =>
+        Assert.AreEqual("10mm", _sut.Evaluate("10", "-18.3mm").Text);
     [TestMethod] public void NegativeWithoutSelectionIsAbsolute() => Assert.IsFalse(_sut.Evaluate("-5").IsRelative);
     [TestMethod] public void DividingLengthsProducesScalar() => Assert.AreEqual("5", _sut.Evaluate("/5mm", "25mm").Text);
     [TestMethod] public void ConvertsSmallLengthToReadableSi() => Assert.AreEqual("0.04mm", _sut.Evaluate("/500", "2cm", true).Text);
@@ -58,6 +66,8 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("+5")]
     [DataRow("*2")]
     [DataRow("/2")]
+    [DataRow("^2")]
+    [DataRow("r")]
     public void RelativeOperationRequiresSelection(string expression)
         => Assert.ThrowsExactly<CalculationException>(() => _sut.Evaluate(expression));
 
