@@ -1,6 +1,6 @@
 # Raport testów QuickCalc
 
-Data: 2026-09-25
+Data: 2026-09-26
 
 ## Zaimplementowane
 
@@ -24,7 +24,9 @@ Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
 Nowe testy integracyjne potwierdzają dostarczenie komunikatu `WM_HOTKEY` do okna komunikatów oraz zachowanie pierwszego skrótu po wymuszonym konflikcie rejestracji drugiego skrótu.
 
-Testy integracyjne potwierdzają także rzeczywiste pokazanie popupu i podglądu `10+5 = 15`, wykrycie dokładnego zaznaczenia standardowej kontrolki oraz pełny przepływ względny: zaznaczone `25mm`, wyrażenie `+5`, wynik i zastąpienie tekstu `30mm`. Test awaryjnego `SendInput` dla kontrolki bez indeksów Win32 został pominięty, ponieważ runner testów nie dostał prawa do okna pierwszoplanowego; sama ścieżka jest wykonywana po skrócie użytkownika i wymaga końcowej kontroli w konkretnej przeglądarce.
+Testy integracyjne potwierdzają także rzeczywiste pokazanie popupu i podglądu `10+5 = 15`, wykrycie dokładnego zaznaczenia standardowej kontrolki oraz pełny przepływ względny: zaznaczone `25mm`, wyrażenie `+5`, wynik i zastąpienie tekstu `30mm`. Test awaryjnego `SendInput` dla kontrolki bez indeksów Win32 został pominięty przez runner, ale ta ścieżka została dodatkowo sprawdzona na rzeczywistym polu tekstowym przeglądarki Chromium.
+
+Końcowy test przeglądarkowy wykrył właściwą przyczynę wcześniejszych odmów: zarządzana definicja unii Win32 `INPUT` była za mała w procesie x64, więc `SendInput` zwracał błąd 87. Po dodaniu największego wariantu unii rozmiar jest sprawdzany regresyjnie (`40` bajtów x64, `28` bajtów x86). Na rzeczywistym polu wyszukiwania Chromium potwierdzono dwa przepływy: zaznaczone `42345` i `+3` zostało zastąpione przez `42348`, a wyrażenie bezwzględne `5+3` w pustym polu z kursorem wstawiło `8`.
 
 Po raporcie użytkownika naprawiono brak bibliotek UI Automation w publikacji, obsługę zaznaczonej liczby bez jednostki (`23` i `+3` daje `26`), interpretację wyniku Enter, przywracanie pierwszego planu oraz dźwięk systemowy Enter/Escape. Skrypt publikujący kopiuje wymagane biblioteki i uruchamia gotowy EXE z `--self-test`; publikacja jest odrzucana, jeżeli UI Automation lub względny parser nie załadują się z katalogu dystrybucyjnego.
 
@@ -38,7 +40,7 @@ Samowystarczalna publikacja x64 została utworzona, a `QuickCalc.App.exe` urucho
 
 ## Niezweryfikowane automatycznie
 
-- rzeczywisty globalny przepływ klawiatury, fokus, zaznaczenie i wstawienie w interaktywnym pulpicie;
+- zachowanie w każdej konkretnej wersji Opery GX i aplikacji ChatGPT; mechanizm UI Automation oraz wstawienie Unicode zweryfikowano w Chromium;
 - współpraca z kontrolkami innych frameworków i aplikacjami na innym poziomie integralności;
 - Altium Designer 18.0.12 — nie był zainstalowany ani dostępny. Wykryto katalog Altium AD25, ale innej wersji nie użyto jako dowodu zgodności;
 - zachowanie przy zmianach topologii monitorów/DPI w trakcie otwarcia okna.

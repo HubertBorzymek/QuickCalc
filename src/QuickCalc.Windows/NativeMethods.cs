@@ -43,9 +43,19 @@ internal static class NativeMethods
     }
 
     [StructLayout(LayoutKind.Sequential)] internal struct Input { internal int type; internal InputUnion union; }
-    [StructLayout(LayoutKind.Explicit)] internal struct InputUnion { [FieldOffset(0)] internal KeyboardInput keyboard; }
+    [StructLayout(LayoutKind.Explicit)] internal struct InputUnion
+    {
+        [FieldOffset(0)] internal KeyboardInput keyboard;
+        // The largest native union member keeps INPUT at 40 bytes on x64
+        // (28 on x86), which is the cbSize required by SendInput.
+        [FieldOffset(0)] internal MouseInput mouse;
+    }
     [StructLayout(LayoutKind.Sequential)] internal struct KeyboardInput
     {
         internal ushort virtualKey; internal ushort scanCode; internal uint flags; internal uint time; internal UIntPtr extraInfo;
+    }
+    [StructLayout(LayoutKind.Sequential)] internal struct MouseInput
+    {
+        internal int dx; internal int dy; internal uint mouseData; internal uint flags; internal uint time; internal UIntPtr extraInfo;
     }
 }

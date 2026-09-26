@@ -26,6 +26,7 @@ public sealed class TargetContextTests
     public void UiAutomationUsesNet9AssemblyAndDoesNotFallBackAfterLoadFailure()
     {
         StringAssert.Contains(TargetContext.UiAutomationAssemblyIdentity, "Version=9.0.0.0");
+        Assert.AreEqual(Environment.Is64BitProcess ? 40 : 28, TargetContext.NativeInputSize);
         var target = TargetContext.CaptureForHandles(IntPtr.Zero, IntPtr.Zero);
         Assert.IsFalse(target.DetectionMethod.Contains("FileNotFoundException", StringComparison.Ordinal));
         Assert.IsFalse(target.DetectionMethod.Contains("TypeLoadException", StringComparison.Ordinal));

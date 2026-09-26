@@ -1,19 +1,56 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows.Automation;
+using System.Windows.Automation.Text;
 
 namespace QuickCalc.Windows;
 
-public sealed record TargetContext(
-    IntPtr WindowHandle,
-    IntPtr ControlHandle,
-    int? SelectionStart,
-    int? SelectionEnd,
-    string? SelectedText,
-    string DetectionMethod)
+public sealed class TargetContext
 {
+    private readonly AutomationElement? _automationTarget;
+    private readonly TextPatternRange? _automationRange;
+
+    public TargetContext(
+        IntPtr windowHandle,
+        IntPtr controlHandle,
+        int? selectionStart,
+        int? selectionEnd,
+        string? selectedText,
+        string detectionMethod)
+        : this(windowHandle, controlHandle, selectionStart, selectionEnd, selectedText, detectionMethod, null, null)
+    {
+    }
+
+    private TargetContext(
+        IntPtr windowHandle,
+        IntPtr controlHandle,
+        int? selectionStart,
+        int? selectionEnd,
+        string? selectedText,
+        string detectionMethod,
+        AutomationElement? automationTarget,
+        TextPatternRange? automationRange)
+    {
+        WindowHandle = windowHandle;
+        ControlHandle = controlHandle;
+        SelectionStart = selectionStart;
+        SelectionEnd = selectionEnd;
+        SelectedText = selectedText;
+        DetectionMethod = detectionMethod;
+        _automationTarget = automationTarget;
+        _automationRange = automationRange;
+    }
+
+    public IntPtr WindowHandle { get; }
+    public IntPtr ControlHandle { get; }
+    public int? SelectionStart { get; }
+    public int? SelectionEnd { get; }
+    public string? SelectedText { get; }
+    public string DetectionMethod { get; }
+    public string? LastFailureReason { get; private set; }
     public bool HasSelection => !string.IsNullOrEmpty(SelectedText);
     public static string UiAutomationAssemblyIdentity => typeof(AutomationElement).Assembly.FullName ?? "UIAutomationClient";
+    public static int NativeInputSize => Marshal.SizeOf<NativeMethods.Input>();
 
     public static TargetContext Capture()
     {
@@ -31,8 +68,9 @@ public sealed record TargetContext(
         {
             if (TryStandardEditSelection(control, out var start, out var end, out var text))
                 return new TargetContext(window, control, start, end, text, "Win32 EM_GETSEL");
-            if (TryAutomationSelection(control, out text))
-                return new TargetContext(window, control, null, null, text, "UI Automation TextPattern");
+            if (TryAutomationSelection(control, out text, out var automationTarget, out var automationRange))
+                return new TargetContext(window, control, null, null, text, "UI Automation TextPattern",
+                    automationTarget, automationRange);
             return new TargetContext(window, control, null, null, null, "brak wiarygodnej detekcji");
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
@@ -58,7 +96,53 @@ public sealed record TargetContext(
 
     public bool RestoreFocus()
     {
-        if (!IsValid || !NativeMethods.IsWindowEnabled(WindowHandle)) return false;
+        LastFailureReason = null;
+        if (!IsValid || !NativeMethods.IsWindowEnabled(WindowHandle))
+        {
+            LastFailureReason = "Okno docelowe już nie istnieje lub jest wyłączone.";
+            return false;
+        }
+
+        if (!RestoreNativeFocus()) return false;
+
+        if (_automationTarget is null || _automationRange is null)
+        {
+            if (SelectionStart is int start && SelectionEnd is int end)
+                NativeMethods.SendMessage(ControlHandle, NativeMethods.EmSetSel, (IntPtr)start, (IntPtr)end);
+            return true;
+        }
+
+        try
+        {
+            // Browser and Electron editors normally expose only their top-level HWND.
+            // Restore the real editable child and the exact selection/caret through UIA.
+            _automationTarget.SetFocus();
+            _automationRange.Select();
+
+            if (!_automationTarget.TryGetCurrentPattern(TextPattern.Pattern, out var pattern))
+            {
+                LastFailureReason = "Pole docelowe utraciło obsługę UI Automation TextPattern.";
+                return false;
+            }
+
+            var current = ((TextPattern)pattern).GetSelection();
+            if (current.Length != 1 || current[0].GetText(-1) != (SelectedText ?? string.Empty))
+            {
+                LastFailureReason = "UI Automation nie potwierdziło odtworzenia pierwotnego zaznaczenia lub kursora.";
+                return false;
+            }
+            return true;
+        }
+        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or
+                                   UnauthorizedAccessException or COMException)
+        {
+            LastFailureReason = $"Nie udało się odtworzyć zakresu UI Automation: {ex.GetType().Name}: {ex.Message}";
+            return false;
+        }
+    }
+
+    private bool RestoreNativeFocus()
+    {
         var targetThread = NativeMethods.GetWindowThreadProcessId(WindowHandle, out _);
         var currentThread = NativeMethods.GetCurrentThreadId();
         var attached = targetThread != currentThread && NativeMethods.AttachThreadInput(currentThread, targetThread, true);
@@ -68,9 +152,9 @@ public sealed record TargetContext(
             NativeMethods.SetForegroundWindow(WindowHandle);
             NativeMethods.SetActiveWindow(WindowHandle);
             NativeMethods.SetFocus(ControlHandle);
-            if (SelectionStart is int start && SelectionEnd is int end)
-                NativeMethods.SendMessage(ControlHandle, NativeMethods.EmSetSel, (IntPtr)start, (IntPtr)end);
-            return NativeMethods.GetForegroundWindow() == WindowHandle;
+            if (NativeMethods.GetForegroundWindow() == WindowHandle) return true;
+            LastFailureReason = "Windows odmówił przywrócenia okna docelowego na pierwszy plan.";
+            return false;
         }
         finally { if (attached) NativeMethods.AttachThreadInput(currentThread, targetThread, false); }
     }
@@ -87,7 +171,9 @@ public sealed record TargetContext(
             return true;
         }
         if (!RestoreFocus()) return false;
-        return SendUnicode(value);
+        if (SendUnicode(value)) return true;
+        LastFailureReason = $"SendInput nie wstawił wszystkich znaków (kod Win32: {Marshal.GetLastWin32Error()}).";
+        return false;
     }
 
     private static bool TryStandardEditSelection(IntPtr control, out int start, out int end, out string? selected)
@@ -106,19 +192,24 @@ public sealed record TargetContext(
         return true;
     }
 
-    private static bool TryAutomationSelection(IntPtr control, out string? selected)
+    private static bool TryAutomationSelection(
+        IntPtr control,
+        out string? selected,
+        out AutomationElement? automationTarget,
+        out TextPatternRange? automationRange)
     {
-        selected = null;
+        selected = null; automationTarget = null; automationRange = null;
         try
         {
             // Browser/Electron address bars and editors often share a top-level HWND.
             // The globally focused UIA element identifies the actual editable child.
             var element = AutomationElement.FocusedElement;
-            if (!TryGetTextSelection(element, out selected))
+            if (!TryGetTextSelection(element, out selected, out automationRange))
             {
                 element = AutomationElement.FromHandle(control);
-                return TryGetTextSelection(element, out selected);
+                if (!TryGetTextSelection(element, out selected, out automationRange)) return false;
             }
+            automationTarget = element;
             return true;
         }
         catch (ElementNotAvailableException) { return false; }
@@ -127,13 +218,17 @@ public sealed record TargetContext(
         catch (COMException) { return false; }
     }
 
-    private static bool TryGetTextSelection(AutomationElement? element, out string? selected)
+    private static bool TryGetTextSelection(
+        AutomationElement? element,
+        out string? selected,
+        out TextPatternRange? selectionRange)
     {
-        selected = null;
+        selected = null; selectionRange = null;
         if (element is null || !element.TryGetCurrentPattern(TextPattern.Pattern, out var pattern)) return false;
         var ranges = ((TextPattern)pattern).GetSelection();
         if (ranges.Length != 1) return false;
-        var value = ranges[0].GetText(-1);
+        selectionRange = ranges[0];
+        var value = selectionRange.GetText(-1);
         if (!string.IsNullOrEmpty(value)) selected = value;
         return true;
     }

@@ -134,7 +134,8 @@ internal sealed class QuickCalcContext : ApplicationContext
         }
         else if (!target.InsertOrReplace(operation.Result!))
         {
-            AddDiagnostic("Odmowa wstawienia: nie udało się bezpiecznie przywrócić celu lub zakresu zaznaczenia.");
+            AddDiagnostic("Odmowa wstawienia: " + (target.LastFailureReason ??
+                "nie udało się bezpiecznie przywrócić celu lub zakresu zaznaczenia."));
             _popup?.ShowOperationError("Nie udało się bezpiecznie przywrócić pola docelowego."); return;
         }
         else AddDiagnostic("Wynik wstawiono do kontrolki docelowej.");
