@@ -7,6 +7,7 @@ namespace QuickCalc.Windows;
 
 public sealed class TargetContext
 {
+    private static int _automationProbeInFlight;
     private readonly AutomationElement? _automationTarget;
     private readonly TextPatternRange? _automationRange;
 
@@ -16,8 +17,10 @@ public sealed class TargetContext
         int? selectionStart,
         int? selectionEnd,
         string? selectedText,
-        string detectionMethod)
-        : this(windowHandle, controlHandle, selectionStart, selectionEnd, selectedText, detectionMethod, null, null)
+        string detectionMethod,
+        Rectangle? targetBounds = null)
+        : this(windowHandle, controlHandle, selectionStart, selectionEnd, selectedText, detectionMethod,
+            null, null, targetBounds)
     {
     }
 
@@ -29,7 +32,8 @@ public sealed class TargetContext
         string? selectedText,
         string detectionMethod,
         AutomationElement? automationTarget,
-        TextPatternRange? automationRange)
+        TextPatternRange? automationRange,
+        Rectangle? targetBounds)
     {
         WindowHandle = windowHandle;
         ControlHandle = controlHandle;
@@ -39,6 +43,7 @@ public sealed class TargetContext
         DetectionMethod = detectionMethod;
         _automationTarget = automationTarget;
         _automationRange = automationRange;
+        TargetBounds = targetBounds;
     }
 
     public IntPtr WindowHandle { get; }
@@ -47,6 +52,7 @@ public sealed class TargetContext
     public int? SelectionEnd { get; }
     public string? SelectedText { get; }
     public string DetectionMethod { get; }
+    public Rectangle? TargetBounds { get; }
     public string? LastFailureReason { get; private set; }
     public bool HasSelection => !string.IsNullOrEmpty(SelectedText);
     public static string UiAutomationAssemblyIdentity => typeof(AutomationElement).Assembly.FullName ?? "UIAutomationClient";
@@ -60,14 +66,11 @@ public sealed class TargetContext
         var control = NativeMethods.GetGUIThreadInfo(thread, ref info) && info.hwndFocus != IntPtr.Zero ? info.hwndFocus : window;
 
         var captured = CaptureForHandles(window, control);
-        if (captured.HasSelection || !TryReadSelectionByCopy(out var copiedSelection)) return captured;
+        if (captured.HasSelection || captured.DetectionMethod != "brak wiarygodnej detekcji" ||
+            !TryReadSelectionByCopy(out var copiedSelection)) return captured;
 
-        AutomationElement? focusedElement = null;
-        try { focusedElement = AutomationElement.FocusedElement; }
-        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or
-                                   UnauthorizedAccessException or COMException) { }
         return new TargetContext(window, control, null, null, copiedSelection,
-            "Ctrl+C (niezależne od UI Automation)", focusedElement, null);
+            "Ctrl+C (niezależne od UI Automation)", null, null, captured.TargetBounds);
     }
 
     public static TargetContext CaptureForHandles(IntPtr window, IntPtr control)
@@ -75,11 +78,16 @@ public sealed class TargetContext
         try
         {
             if (TryStandardEditSelection(control, out var start, out var end, out var text))
-                return new TargetContext(window, control, start, end, text, "Win32 EM_GETSEL");
-            if (TryAutomationSelection(control, out text, out var automationTarget, out var automationRange))
+                return new TargetContext(window, control, start, end, text, "Win32 EM_GETSEL", GetNativeBounds(control));
+            var automationStatus = TryAutomationSelectionWithTimeout(control, out text,
+                out var automationTarget, out var automationRange, out var automationBounds);
+            if (automationStatus == AutomationProbeStatus.Success)
                 return new TargetContext(window, control, null, null, text, "UI Automation TextPattern",
-                    automationTarget, automationRange);
-            return new TargetContext(window, control, null, null, null, "brak wiarygodnej detekcji");
+                    automationTarget, automationRange, automationBounds ?? GetNativeBounds(control));
+            var method = automationStatus == AutomationProbeStatus.Timeout
+                ? "limit czasu UI Automation — pominięto analizę"
+                : "brak wiarygodnej detekcji";
+            return new TargetContext(window, control, null, null, null, method, GetNativeBounds(control));
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
@@ -96,7 +104,7 @@ public sealed class TargetContext
         var thread = NativeMethods.GetWindowThreadProcessId(window, out _);
         var info = new NativeMethods.GuiThreadInfo { cbSize = Marshal.SizeOf<NativeMethods.GuiThreadInfo>() };
         var control = NativeMethods.GetGUIThreadInfo(thread, ref info) && info.hwndFocus != IntPtr.Zero ? info.hwndFocus : window;
-        return new TargetContext(window, control, null, null, null, reason);
+        return new TargetContext(window, control, null, null, null, reason, GetNativeBounds(control));
     }
 
     public bool IsValid => WindowHandle != IntPtr.Zero && ControlHandle != IntPtr.Zero &&
@@ -187,8 +195,7 @@ public sealed class TargetContext
             WaitForInjectedInput();
             if (HasSelection && !SelectPreviousCharacters(value.Length))
             {
-                LastFailureReason = $"Wynik wklejono, ale nie udało się zaznaczyć go w całości (kod {Marshal.GetLastWin32Error()}).";
-                return false;
+                LastFailureReason = $"Wynik wklejono, ale Windows odrzucił ponowne zaznaczenie (kod {Marshal.GetLastWin32Error()}).";
             }
             WaitForInjectedInput();
             return true;
@@ -214,6 +221,43 @@ public sealed class TargetContext
         NativeMethods.SendMessage(control, NativeMethods.WmGetText, (IntPtr)buffer.Capacity, buffer);
         selected = buffer.ToString(start, end - start);
         return true;
+    }
+
+    private enum AutomationProbeStatus { Success, Unavailable, Timeout }
+
+    private static AutomationProbeStatus TryAutomationSelectionWithTimeout(
+        IntPtr control,
+        out string? selected,
+        out AutomationElement? automationTarget,
+        out TextPatternRange? automationRange,
+        out Rectangle? automationBounds)
+    {
+        selected = null; automationTarget = null; automationRange = null; automationBounds = null;
+        if (Interlocked.CompareExchange(ref _automationProbeInFlight, 1, 0) != 0)
+            return AutomationProbeStatus.Timeout;
+
+        string? workerSelected = null;
+        AutomationElement? workerTarget = null;
+        TextPatternRange? workerRange = null;
+        Rectangle? workerBounds = null;
+        var succeeded = false;
+        var finished = new ManualResetEventSlim();
+        var worker = new Thread(() =>
+        {
+            try
+            {
+                succeeded = TryAutomationSelection(control, out workerSelected, out workerTarget, out workerRange);
+                if (succeeded) workerBounds = GetAutomationBounds(workerTarget);
+            }
+            finally { Interlocked.Exchange(ref _automationProbeInFlight, 0); finished.Set(); }
+        }) { IsBackground = true, Name = "QuickCalc UI Automation probe" };
+        worker.SetApartmentState(ApartmentState.MTA);
+        worker.Start();
+        if (!finished.Wait(TimeSpan.FromMilliseconds(45))) return AutomationProbeStatus.Timeout;
+        if (!succeeded) return AutomationProbeStatus.Unavailable;
+        selected = workerSelected; automationTarget = workerTarget; automationRange = workerRange;
+        automationBounds = workerBounds;
+        return AutomationProbeStatus.Success;
     }
 
     private static bool TryAutomationSelection(
@@ -266,10 +310,10 @@ public sealed class TargetContext
             var marker = "QuickCalc/" + Guid.NewGuid().ToString("N");
             SetClipboardText(marker);
             if (!SendChord(NativeMethods.VkControl, NativeMethods.VkC)) return false;
-            for (var attempt = 0; attempt < 20; attempt++)
+            for (var attempt = 0; attempt < 4; attempt++)
             {
                 Application.DoEvents();
-                Thread.Sleep(10);
+                Thread.Sleep(5);
                 var value = GetClipboardText();
                 if (value == marker) continue;
                 if (!string.IsNullOrEmpty(value)) { selected = value; return true; }
@@ -304,10 +348,33 @@ public sealed class TargetContext
         // SendInput only queues the keys. Pumping messages matters when the target
         // lives on this UI thread (tests and some embedded editors) and is harmless
         // for external applications.
-        for (var attempt = 0; attempt < 6; attempt++)
+        for (var attempt = 0; attempt < 10; attempt++)
         {
             Application.DoEvents();
             Thread.Sleep(10);
+        }
+    }
+
+    private static Rectangle? GetNativeBounds(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero || !NativeMethods.GetWindowRect(handle, out var rect) ||
+            rect.right <= rect.left || rect.bottom <= rect.top) return null;
+        return Rectangle.FromLTRB(rect.left, rect.top, rect.right, rect.bottom);
+    }
+
+    private static Rectangle? GetAutomationBounds(AutomationElement? element)
+    {
+        try
+        {
+            if (element is null) return null;
+            var rect = element.Current.BoundingRectangle;
+            if (rect.IsEmpty || rect.Width <= 0 || rect.Height <= 0) return null;
+            return Rectangle.FromLTRB((int)Math.Floor(rect.Left), (int)Math.Floor(rect.Top),
+                (int)Math.Ceiling(rect.Right), (int)Math.Ceiling(rect.Bottom));
+        }
+        catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or COMException)
+        {
+            return null;
         }
     }
 

@@ -79,17 +79,20 @@ internal sealed class QuickCalcContext : ApplicationContext
 
     private void Open(CalculatorMode mode)
     {
+        var openingTimer = Stopwatch.StartNew();
         AddDiagnostic($"Rozpoczynam otwieranie trybu {mode}.");
         if (_popup is { Visible: true })
         {
             AddDiagnostic("Popup już istnieje — przenoszę go na bieżący ekran i aktywuję.");
-            _popup.MoveToCurrentCursorScreen(); _popup.BringToFront(); _popup.Activate(); return;
+            _popup.MoveToPreferredLocation(); _popup.BringToFront(); _popup.Activate(); return;
         }
 
         TargetContext target;
         try
         {
-            target = TargetContext.Capture();
+            target = mode == CalculatorMode.Clipboard
+                ? TargetContext.CaptureBasic("tryb schowka — bez analizy zaznaczenia")
+                : TargetContext.Capture();
         }
         catch (Exception ex)
         {
@@ -103,14 +106,14 @@ internal sealed class QuickCalcContext : ApplicationContext
                 target = new TargetContext(IntPtr.Zero, IntPtr.Zero, null, null, null, "tryb awaryjny bez celu");
             }
         }
-        AddDiagnostic($"Otwarcie trybu {mode}; cel=0x{target.WindowHandle.ToInt64():X}, kontrolka=0x{target.ControlHandle.ToInt64():X}, metoda={target.DetectionMethod}, zaznaczenie={target.HasSelection}, poprawny={target.IsValid}.");
+        AddDiagnostic($"Otwarcie trybu {mode}; cel=0x{target.WindowHandle.ToInt64():X}, kontrolka=0x{target.ControlHandle.ToInt64():X}, metoda={target.DetectionMethod}, zaznaczenie={target.HasSelection}, poprawny={target.IsValid}, przechwycenie={openingTimer.ElapsedMilliseconds} ms.");
         try
         {
             _popup = new CalculatorPopup(mode, target, _evaluator, _history);
             _popup.OperationFinished += (_, operation) => Complete(target, operation);
             _popup.FormClosed += (_, _) => _popup = null;
-            _popup.Show(); _popup.MoveToCurrentCursorScreen(); _popup.BringToFront(); _popup.Activate();
-            AddDiagnostic($"Popup pokazany: uchwyt=0x{_popup.Handle.ToInt64():X}, Visible={_popup.Visible}, Bounds={_popup.Bounds}.");
+            _popup.Show(); _popup.MoveToPreferredLocation(); _popup.BringToFront(); _popup.Activate();
+            AddDiagnostic($"Popup pokazany po {openingTimer.ElapsedMilliseconds} ms: uchwyt=0x{_popup.Handle.ToInt64():X}, Visible={_popup.Visible}, Bounds={_popup.Bounds}.");
         }
         catch (Exception ex)
         {
@@ -124,7 +127,7 @@ internal sealed class QuickCalcContext : ApplicationContext
     private void Complete(TargetContext target, PopupOperation operation)
     {
         _popup?.Hide(); Application.DoEvents();
-        if (operation.Cancelled) { target.RestoreFocus(); _popup?.Close(); return; }
+        if (operation.Cancelled) { target.RestoreFocus(); ClosePopup(); return; }
         if (operation.Mode == CalculatorMode.Clipboard)
         {
             try { Clipboard.SetText(operation.Result!); }
@@ -138,8 +141,19 @@ internal sealed class QuickCalcContext : ApplicationContext
                 "nie udało się bezpiecznie przywrócić celu lub zakresu zaznaczenia."));
             _popup?.ShowOperationError("Nie udało się bezpiecznie przywrócić pola docelowego."); return;
         }
-        else AddDiagnostic("Wynik wstawiono do kontrolki docelowej.");
-        _popup?.Close();
+        else AddDiagnostic(target.LastFailureReason is null
+            ? "Wynik wstawiono do kontrolki docelowej."
+            : "Wynik wstawiono; ostrzeżenie: " + target.LastFailureReason);
+        ClosePopup();
+    }
+
+    private void ClosePopup()
+    {
+        var popup = _popup;
+        if (popup is null) return;
+        popup.Close();
+        if (!popup.IsDisposed) popup.Dispose();
+        if (ReferenceEquals(_popup, popup)) _popup = null;
     }
 
     private void ShowDiagnostics()

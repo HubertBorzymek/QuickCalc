@@ -26,6 +26,8 @@ Domyślne skróty:
 
 Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Nie rejestruje autostartu.
 
+W trybie kontekstowym popup jest ustawiany lekko pod aktywnym polem tekstowym (lub nad nim, gdy pod spodem brakuje miejsca). Tryb schowka otwiera się przy kursorze myszy. Tryb schowka nie uruchamia analizy zaznaczenia, a zapytanie UI Automation trybu kontekstowego ma twardy limit czasu, więc wadliwy dostawca edytora nie może blokować pojawienia się okna.
+
 ### Diagnostyka skrótów
 
 Kliknij prawym przyciskiem ikonę QuickCalc w zasobniku i wybierz **Diagnostyka…**. Okno pokazuje osobny stan rejestracji obu skrótów, dokładny błąd Win32, numer sesji procesu oraz dziennik komunikatów `WM_HOTKEY`. Pola **Klawisz** i **Modyfikatory** pozwalają zmienić oba skróty bez restartu; przycisk **Zastosuj skróty** zapisuje konfigurację. Modyfikatory wpisuje się jako `None`, `Control`, `Shift`, `Alt`, `Win` lub połączenie, np. `Control+Shift`. Jeśli nowy skrót jest zajęty, poprzednia konfiguracja zostanie przywrócona.

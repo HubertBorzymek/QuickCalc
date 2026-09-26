@@ -28,6 +28,7 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool GetGUIThreadInfo(uint idThread, ref GuiThreadInfo info);
     [DllImport("user32.dll")] internal static extern bool IsWindow(IntPtr hWnd);
     [DllImport("user32.dll")] internal static extern bool IsWindowEnabled(IntPtr hWnd);
+    [DllImport("user32.dll")] internal static extern bool GetWindowRect(IntPtr hWnd, out Rect rect);
     [DllImport("user32.dll")] internal static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] internal static extern bool BringWindowToTop(IntPtr hWnd);
     [DllImport("user32.dll")] internal static extern IntPtr SetActiveWindow(IntPtr hWnd);
@@ -45,6 +46,10 @@ internal static class NativeMethods
         internal int cbSize; internal uint flags; internal IntPtr hwndActive; internal IntPtr hwndFocus;
         internal IntPtr hwndCapture; internal IntPtr hwndMenuOwner; internal IntPtr hwndMoveSize; internal IntPtr hwndCaret;
         internal System.Drawing.Rectangle rcCaret;
+    }
+    [StructLayout(LayoutKind.Sequential)] internal struct Rect
+    {
+        internal int left; internal int top; internal int right; internal int bottom;
     }
 
     [StructLayout(LayoutKind.Sequential)] internal struct Input { internal int type; internal InputUnion union; }

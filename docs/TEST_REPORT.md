@@ -19,8 +19,8 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
 - `QuickCalc.Core.Tests`: 53 zaliczone, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 12 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 66 przypadków, z czego 65 zaliczonych i 1 pominięty.
+- `QuickCalc.Integration.Tests`: 16 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 70 przypadków, z czego 69 zaliczonych i 1 pominięty.
 
 Pominięty w pełnym przebiegu test wymaga wyłącznego prawa do okna pierwszoplanowego. Uruchomiony osobno (`VerifiedSelectionWithoutWin32IndexesUsesClipboardPasteFallback`) zakończył się powodzeniem: 1 zaliczony, 0 pominiętych. Potwierdza wklejenie przez `Ctrl+V` i odtworzenie schowka w kontrolce bez zapisanych indeksów Win32.
 
@@ -33,6 +33,8 @@ Końcowy test przeglądarkowy wykrył właściwą przyczynę wcześniejszych odm
 Po kolejnym raporcie usunięto błędny warunek wymagający, aby dostawca UI Automation po utracie i odzyskaniu fokusu zwrócił identyczny tekst zaznaczenia. Zaznaczenie niestandardowych edytorów jest teraz dodatkowo wykrywane przez tymczasowe `Ctrl+C`, a wynik trafia do nich przez standardowe `Ctrl+V` z odtworzeniem wcześniejszego schowka. Test integracyjny wykrył i naprawił wyścig, w którym stary schowek mógł zostać przywrócony przed obsłużeniem `Ctrl+V`.
 
 Dodane regresje sprawdzają pełne zaznaczenie dłuższego wyniku, pozycję kursora po wstawieniu bez zaznaczenia, zachowanie odstępu przed jednostką, przedrostki SI i jednostki elektroniczne, potęgowanie, pierwiastek `r` oraz zatwierdzenie z konwersją SI przez `Shift+Enter` (`2cm / 500 → 0.04mm`, `5ft → 1.524m`).
+
+Po raporcie o opóźnieniach Visual Studio tryb schowka został całkowicie oddzielony od analizy zaznaczenia. Zapytanie UI Automation ma limit 45 ms i nie może blokować kolejnych wywołań, a awaryjna próba `Ctrl+C` czeka najwyżej około 20 ms. Dziennik zapisuje osobno czas przechwycenia i całkowity czas pokazania popupu. Testy potwierdzają ograniczoną latencję, natychmiastowe przechwycenie podstawowe, zamknięcie popupu po sukcesie oraz ustawienie okna pod prostokątem pola tekstowego.
 
 Po raporcie użytkownika naprawiono brak bibliotek UI Automation w publikacji, obsługę zaznaczonej liczby bez jednostki (`23` i `+3` daje `26`), interpretację wyniku Enter, przywracanie pierwszego planu oraz dźwięk systemowy Enter/Escape. Skrypt publikujący kopiuje wymagane biblioteki i uruchamia gotowy EXE z `--self-test`; publikacja jest odrzucana, jeżeli UI Automation lub względny parser nie załadują się z katalogu dystrybucyjnego.
 

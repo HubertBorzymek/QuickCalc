@@ -1,5 +1,6 @@
 using QuickCalc.Windows;
 using QuickCalc.Core;
+using System.Diagnostics;
 using System.Windows.Forms;
 
 namespace QuickCalc.Integration.Tests;
@@ -30,6 +31,27 @@ public sealed class TargetContextTests
         var target = TargetContext.CaptureForHandles(IntPtr.Zero, IntPtr.Zero);
         Assert.IsFalse(target.DetectionMethod.Contains("FileNotFoundException", StringComparison.Ordinal));
         Assert.IsFalse(target.DetectionMethod.Contains("TypeLoadException", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void BasicCaptureUsedByClipboardModeDoesNotProbeSelection()
+    {
+        var timer = Stopwatch.StartNew();
+        var target = TargetContext.CaptureBasic("test trybu schowka");
+        timer.Stop();
+        Assert.AreEqual("test trybu schowka", target.DetectionMethod);
+        Assert.IsTrue(timer.Elapsed < TimeSpan.FromMilliseconds(100),
+            $"Podstawowe przechwycenie trwało {timer.Elapsed.TotalMilliseconds:F0} ms.");
+    }
+
+    [TestMethod]
+    public void AutomationCaptureHasBoundedLatency()
+    {
+        var timer = Stopwatch.StartNew();
+        _ = TargetContext.CaptureForHandles(IntPtr.Zero, IntPtr.Zero);
+        timer.Stop();
+        Assert.IsTrue(timer.Elapsed < TimeSpan.FromMilliseconds(250),
+            $"Przechwycenie UI Automation trwało {timer.Elapsed.TotalMilliseconds:F0} ms.");
     }
 
     [TestMethod]

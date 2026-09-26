@@ -34,7 +34,7 @@ internal sealed class CalculatorPopup : Form
         Controls.AddRange([modeLabel, _expression, _preview, _error, hint]);
         _expression.TextChanged += (_, _) => { if (!_historyNavigation) _history.ResetNavigation(); _historyNavigation = false; RefreshPreview(); };
         _expression.KeyDown += ExpressionKeyDown;
-        Shown += (_, _) => { MoveToCurrentCursorScreen(); _expression.Focus(); };
+        Shown += (_, _) => { MoveToPreferredLocation(); _expression.Focus(); };
         FormClosing += (_, e) =>
         {
             if (_completionRaised) return;
@@ -93,8 +93,25 @@ internal sealed class CalculatorPopup : Form
 
     public void ShowOperationError(string message) { _completionRaised = false; Show(); Activate(); _expression.Focus(); _error.Text = message; }
 
-    public void MoveToCurrentCursorScreen()
+    public void MoveToPreferredLocation()
     {
+        if (_mode == CalculatorMode.Context && _target.TargetBounds is Rectangle targetBounds)
+        {
+            var targetScreen = Screen.FromRectangle(targetBounds).WorkingArea;
+            var looksLikeField = targetBounds.Width < targetScreen.Width * 0.9 &&
+                                 targetBounds.Height < targetScreen.Height * 0.6;
+            if (looksLikeField)
+            {
+                const int gap = 10;
+                var y = targetBounds.Bottom + gap;
+                if (y + Height > targetScreen.Bottom) y = targetBounds.Top - Height - gap;
+                Location = new Point(
+                    Math.Clamp(targetBounds.Left, targetScreen.Left, targetScreen.Right - Width),
+                    Math.Clamp(y, targetScreen.Top, targetScreen.Bottom - Height));
+                return;
+            }
+        }
+
         var area = Screen.FromPoint(Cursor.Position).WorkingArea;
         const int margin = 32;
         var x = Cursor.Position.X + margin + Width <= area.Right
