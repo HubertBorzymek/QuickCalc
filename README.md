@@ -12,6 +12,10 @@ Najprościej dwukrotnie kliknąć `Start-QuickCalc.cmd`. Plik uruchamia gotową 
 
 Aby uruchamiać QuickCalc przy logowaniu do Windows, dwukrotnie kliknij `Install-QuickCalc-Autostart.cmd`. Tworzy on skrót `QuickCalc.lnk` w folderze Autostart bieżącego użytkownika; skrót wskazuje na `Start-QuickCalc.cmd`, więc przenoszenie samego pliku do folderu Autostart nie jest potrzebne.
 
+### Przenoszenie na inny komputer
+
+Uruchom `Create-QuickCalc-Release.ps1`. Skrypt tworzy gotowy folder `artifacts\release\QuickCalc-portable-win-x64` oraz odpowiadający mu plik ZIP. Pakiet jest samowystarczalny dla Windows 10/11 x64 i nie wymaga instalowania .NET ani Visual Studio. Na drugi komputer należy przenieść cały folder lub ZIP, rozpakować go w stałym miejscu i dwukrotnie kliknąć znajdujący się wewnątrz `Start-QuickCalc.cmd`. Do pakietu dołączone są osobne skrypty dodawania i usuwania autostartu.
+
 W Visual Studio 2026:
 
 1. Otwórz `QuickCalc.sln`.
