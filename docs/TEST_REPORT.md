@@ -19,8 +19,8 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
 - `QuickCalc.Core.Tests`: 83 zaliczone, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 26 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 110 przypadków, z czego 109 zaliczonych i 1 pominięty.
+- `QuickCalc.Integration.Tests`: 27 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 111 przypadków, z czego 110 zaliczonych i 1 pominięty.
 
 Testy klawiaturowego `Ctrl+C` i awaryjnego `Ctrl+V` wymagają wyłącznego prawa do okna pierwszoplanowego. W ostatnim pełnym przebiegu runner nie przyznał go testowi kopiowania, dlatego został oznaczony jako pominięty zamiast fałszywie pozytywnego. Test wklejenia i ponownego zaznaczenia przeszedł; oba przepływy mają także niezależne testy polityki i schowka.
 
@@ -47,6 +47,8 @@ Po testach aplikacji GPT i pól Altium wyszukiwanie wzorca tekstowego objęło t
 Ponieważ część pól Altium nie udostępnia zakresu ani przez `EM_GETSEL`, ani UI Automation, dodano bezpośredni `WM_COPY` do aktywnej kontrolki. W przeciwieństwie do klawiaturowego `Ctrl+C` nie uruchamia on polecenia edytora Visual Studio. Schowek jest oznaczany wartością kontrolną i odtwarzany; wynik jest przyjmowany tylko wtedy, gdy kontrolka faktycznie skopiuje poprawną liczbę z opcjonalną jednostką. Test integracyjny potwierdza odczyt zaznaczonego `25mm` oraz brak fałszywego wyniku przy samym kursorze.
 
 Po potwierdzeniu, że pole Altium nie obsługuje również `WM_COPY`, klawiaturowe `Ctrl+C` stało się końcowym fallbackiem dla nieprzezroczystych kontrolek. Jest wykonywane przed pokazaniem popupu, a schowek zostaje odtworzony. Wyjątkiem jest niepotwierdzone zaznaczenie w procesie `devenv`: Visual Studio mapuje `Ctrl+C` bez zaznaczenia na asynchroniczne polecenie edytora, którego nie można anulować po wysłaniu i które wcześniej powodowało blokujący dialog. Test polityki potwierdza włączenie fallbacku dla Altium/X2 i wyłączenie wyłącznie dla `devenv`.
+
+Raport z Altium 18.0.12 potwierdził poprawne wykrycie zaznaczenia przez klawiaturowe `Ctrl+C`, ale ujawnił brak weryfikacji fokusu przed wstawieniem. `Ctrl+V` korzysta teraz z oczekującego `SendKeys.SendWait`, tak samo jak działające kopiowanie. Fokus jest sprawdzany na rzeczywistym wątku kontrolki przed i po wklejeniu. Jeżeli pole go nie odzyska lub utraci, QuickCalc nie wysyła `Shift+Left`, dzięki czemu strzałki nie trafiają do interfejsu aplikacji. Diagnostyka zapisuje uchwyt oczekiwany i rzeczywisty oraz zastosowaną metodę wklejenia. Osobna regresja potwierdza odmowę wstawienia do kontrolki, która nie może odzyskać fokusu.
 
 Po raporcie użytkownika naprawiono brak bibliotek UI Automation w publikacji, obsługę zaznaczonej liczby bez jednostki (`23` i `+3` daje `26`), interpretację wyniku Enter, przywracanie pierwszego planu oraz dźwięk systemowy Enter/Escape. Skrypt publikujący kopiuje wymagane biblioteki i uruchamia gotowy EXE z `--self-test`; publikacja jest odrzucana, jeżeli UI Automation lub względny parser nie załadują się z katalogu dystrybucyjnego.
 

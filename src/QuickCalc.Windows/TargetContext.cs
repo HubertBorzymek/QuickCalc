@@ -59,6 +59,7 @@ public sealed class TargetContext
     public string DetectionMethod { get; }
     public Rectangle? TargetBounds { get; }
     public string? LastFailureReason { get; private set; }
+    public string? LastInsertionDiagnostics { get; private set; }
     public bool HasSelection => !string.IsNullOrEmpty(SelectedText);
     public static string UiAutomationAssemblyIdentity => typeof(AutomationElement).Assembly.FullName ?? "UIAutomationClient";
     public static int NativeInputSize => Marshal.SizeOf<NativeMethods.Input>();
@@ -182,31 +183,44 @@ public sealed class TargetContext
             // controls such as Altium fields from selecting all on focus return.
             _automationTarget.SetFocus();
             _automationCaretRange?.Select();
-            return true;
+            WaitForInjectedInput(2);
+            if (IsTargetFocused(out _)) return true;
+            LastFailureReason = BuildFocusFailure("UI Automation nie przywróciło fokusu właściwego pola");
+            return false;
         }
         catch (Exception ex) when (ex is ElementNotAvailableException or InvalidOperationException or
                                    UnauthorizedAccessException or COMException or ArgumentException)
         {
             // UIA is advisory. The editor can invalidate its provider while keeping
             // its native selection, so Ctrl+V still gets a chance to work.
-            LastFailureReason = $"UI Automation nie odtworzyło zakresu ({ex.GetType().Name}); użyto zachowanego zaznaczenia.";
-            return true;
+            if (IsTargetFocused(out _))
+            {
+                LastFailureReason = $"UI Automation nie odtworzyło zakresu ({ex.GetType().Name}); użyto fokusu natywnego.";
+                return true;
+            }
+            LastFailureReason = BuildFocusFailure($"UI Automation nie odtworzyło pola ({ex.GetType().Name})");
+            return false;
         }
     }
 
     private bool RestoreNativeFocus()
     {
-        var targetThread = NativeMethods.GetWindowThreadProcessId(WindowHandle, out _);
+        var targetThread = NativeMethods.GetWindowThreadProcessId(ControlHandle, out _);
         var currentThread = NativeMethods.GetCurrentThreadId();
         var attached = targetThread != currentThread && NativeMethods.AttachThreadInput(currentThread, targetThread, true);
         try
         {
-            NativeMethods.BringWindowToTop(WindowHandle);
-            NativeMethods.SetForegroundWindow(WindowHandle);
-            NativeMethods.SetActiveWindow(WindowHandle);
-            NativeMethods.SetFocus(ControlHandle);
-            if (NativeMethods.GetForegroundWindow() == WindowHandle) return true;
-            LastFailureReason = "Windows odmówił przywrócenia okna docelowego na pierwszy plan.";
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                NativeMethods.BringWindowToTop(WindowHandle);
+                NativeMethods.SetForegroundWindow(WindowHandle);
+                NativeMethods.SetActiveWindow(WindowHandle);
+                NativeMethods.SetFocus(ControlHandle);
+                Application.DoEvents();
+                Thread.Sleep(10);
+                if (IsTargetForeground() && IsTargetFocused(out _)) return true;
+            }
+            LastFailureReason = BuildFocusFailure("Windows odmówił przywrócenia fokusu pola docelowego");
             return false;
         }
         finally { if (attached) NativeMethods.AttachThreadInput(currentThread, targetThread, false); }
@@ -214,6 +228,7 @@ public sealed class TargetContext
 
     public bool InsertOrReplace(string value)
     {
+        LastInsertionDiagnostics = null;
         if (!IsValid)
         {
             LastFailureReason = "Okno docelowe już nie istnieje.";
@@ -228,24 +243,38 @@ public sealed class TargetContext
             NativeMethods.SendMessage(ControlHandle, NativeMethods.EmSetSel,
                 (IntPtr)(HasSelection ? start : caret), (IntPtr)caret);
             RestoreNativeFocus();
+            LastInsertionDiagnostics = $"EM_REPLACESEL; fokus={FormatHandle(GetTargetFocus())}.";
             return true;
         }
         if (!RestoreFocus()) return false;
+        if (!IsTargetFocused(out var focusBeforePaste))
+        {
+            LastFailureReason = BuildFocusFailure("Nie wysłano Ctrl+V, ponieważ właściwe pole nie odzyskało fokusu");
+            return false;
+        }
         try
         {
             using var clipboard = ClipboardSnapshot.Capture();
             SetClipboardText(value);
-            if (!SendChord(NativeMethods.VkControl, NativeMethods.VkV))
+            if (!SendPasteShortcut(out var pasteMethod))
             {
                 LastFailureReason = $"Windows odrzucił skrót Ctrl+V (kod {Marshal.GetLastWin32Error()}).";
                 return false;
             }
             WaitForInjectedInput();
-            if (HasSelection && !SelectPreviousCharacters(value.Length))
+            if (!IsTargetFocused(out var focusAfterPaste))
+            {
+                LastInsertionDiagnostics = $"{pasteMethod}; fokus przed={FormatHandle(focusBeforePaste)}, po={FormatHandle(focusAfterPaste)}.";
+                LastFailureReason = "Pole docelowe utraciło fokus podczas Ctrl+V. Nie wysłano klawiszy ponownego zaznaczania.";
+                return false;
+            }
+            if (HasSelection && !TrySelectInsertedTextDirectly(value.Length) && !SelectPreviousCharacters(value.Length))
             {
                 LastFailureReason = $"Wynik wklejono, ale Windows odrzucił ponowne zaznaczenie (kod {Marshal.GetLastWin32Error()}).";
             }
             WaitForInjectedInput();
+            LastInsertionDiagnostics = $"{pasteMethod}; fokus przed={FormatHandle(focusBeforePaste)}, po={FormatHandle(focusAfterPaste)}; " +
+                                       $"ponowne zaznaczenie={(HasSelection ? "tak" : "nie")}.";
             return true;
         }
         catch (ExternalException ex)
@@ -478,6 +507,21 @@ public sealed class TargetContext
         return NativeMethods.SendInput((uint)inputs.Length, inputs, NativeInputSize) == inputs.Length;
     }
 
+    private static bool SendPasteShortcut(out string method)
+    {
+        try
+        {
+            System.Windows.Forms.SendKeys.SendWait("^v");
+            method = "Ctrl+V przez SendKeys.SendWait";
+            return true;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+        {
+            method = "Ctrl+V przez SendInput (fallback po błędzie SendKeys)";
+            return SendChord(NativeMethods.VkControl, NativeMethods.VkV);
+        }
+    }
+
     private static bool SelectPreviousCharacters(int count)
     {
         if (count <= 0) return true;
@@ -496,6 +540,24 @@ public sealed class TargetContext
         }
     }
 
+    private bool TrySelectInsertedTextDirectly(int count)
+    {
+        if (count <= 0) return true;
+        var className = new StringBuilder(128);
+        NativeMethods.GetClassName(ControlHandle, className, className.Capacity);
+        var classText = className.ToString();
+        if (!classText.Contains("Edit", StringComparison.OrdinalIgnoreCase) &&
+            !classText.Contains("TextBox", StringComparison.OrdinalIgnoreCase) &&
+            !classText.Contains("Scintilla", StringComparison.OrdinalIgnoreCase)) return false;
+
+        var start = 0;
+        var end = 0;
+        if (NativeMethods.SendMessageTimeout(ControlHandle, NativeMethods.EmGetSel, ref start, ref end,
+                NativeMethods.SmtoAbortIfHung, 10, out _) == IntPtr.Zero || end < count) return false;
+        NativeMethods.SendMessage(ControlHandle, NativeMethods.EmSetSel, (IntPtr)(end - count), (IntPtr)end);
+        return true;
+    }
+
     private static void WaitForInjectedInput(int attempts = 10)
     {
         // SendInput only queues the keys. Pumping messages matters when the target
@@ -507,6 +569,35 @@ public sealed class TargetContext
             Thread.Sleep(10);
         }
     }
+
+    private bool IsTargetForeground()
+    {
+        var foreground = NativeMethods.GetForegroundWindow();
+        if (foreground == WindowHandle) return true;
+        var expectedRoot = NativeMethods.GetAncestor(WindowHandle, NativeMethods.GaRoot);
+        var foregroundRoot = NativeMethods.GetAncestor(foreground, NativeMethods.GaRoot);
+        return expectedRoot != IntPtr.Zero && expectedRoot == foregroundRoot;
+    }
+
+    private bool IsTargetFocused(out IntPtr actualFocus)
+    {
+        actualFocus = GetTargetFocus();
+        return actualFocus == ControlHandle ||
+               (actualFocus != IntPtr.Zero && NativeMethods.IsChild(ControlHandle, actualFocus));
+    }
+
+    private IntPtr GetTargetFocus()
+    {
+        var targetThread = NativeMethods.GetWindowThreadProcessId(ControlHandle, out _);
+        var info = new NativeMethods.GuiThreadInfo { cbSize = Marshal.SizeOf<NativeMethods.GuiThreadInfo>() };
+        return targetThread != 0 && NativeMethods.GetGUIThreadInfo(targetThread, ref info) ? info.hwndFocus : IntPtr.Zero;
+    }
+
+    private string BuildFocusFailure(string reason) =>
+        $"{reason}; oczekiwano={FormatHandle(ControlHandle)}, fokus={FormatHandle(GetTargetFocus())}, " +
+        $"pierwszy plan={FormatHandle(NativeMethods.GetForegroundWindow())}.";
+
+    private static string FormatHandle(IntPtr handle) => $"0x{handle.ToInt64():X}";
 
     private static Rectangle? GetNativeBounds(IntPtr handle)
     {

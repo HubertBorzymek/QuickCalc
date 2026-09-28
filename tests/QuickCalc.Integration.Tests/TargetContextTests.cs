@@ -154,6 +154,27 @@ public sealed class TargetContextTests
     }
 
     [TestMethod]
+    public void ClipboardPasteIsNotSentWhenOriginalControlCannotRecoverFocus()
+    {
+        RunStaWithFocusedTextBox("Value: 25mm", 7, 4, (form, box) =>
+        {
+            using var decoy = new Button { Text = "Inny element", Dock = DockStyle.Top };
+            form.Controls.Add(decoy);
+            box.Enabled = false;
+            decoy.BringToFront();
+            decoy.Focus();
+            Application.DoEvents();
+            var target = new TargetContext(form.Handle, box.Handle, null, null, "25mm", "test błędnego fokusu");
+
+            Assert.IsFalse(target.InsertOrReplace("30mm"));
+            Assert.AreEqual("Value: 25mm", box.Text);
+            Assert.IsTrue(decoy.Focused);
+            StringAssert.Contains(target.LastFailureReason ?? string.Empty, "fokusu pola docelowego");
+            StringAssert.Contains(target.LastFailureReason ?? string.Empty, "oczekiwano=0x");
+        });
+    }
+
+    [TestMethod]
     public void RelativeCalculationSupportsSelectedNumberWithoutUnitEndToEnd()
     {
         RunStaWithFocusedTextBox("Value: 23", 7, 2, (form, box) =>
@@ -196,6 +217,7 @@ public sealed class TargetContextTests
             Assert.AreEqual("Value: 30mm", box.Text);
             Assert.AreEqual("30mm", box.SelectedText,
                 $"Kursor={box.SelectionStart}, długość={box.SelectionLength}, błąd={target.LastFailureReason ?? "brak"}");
+            StringAssert.Contains(target.LastInsertionDiagnostics ?? string.Empty, "Ctrl+V przez SendKeys.SendWait");
         });
     }
 

@@ -18,6 +18,7 @@ internal static class NativeMethods
     internal const int InputKeyboard = 1;
     internal const ushort VkControl = 0x11;
     internal const ushort VkV = 0x56;
+    internal const uint GaRoot = 2;
 
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint key);
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool UnregisterHotKey(IntPtr hWnd, int id);
@@ -27,6 +28,8 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)] internal static extern bool GetGUIThreadInfo(uint idThread, ref GuiThreadInfo info);
     [DllImport("user32.dll")] internal static extern bool IsWindow(IntPtr hWnd);
     [DllImport("user32.dll")] internal static extern bool IsWindowEnabled(IntPtr hWnd);
+    [DllImport("user32.dll")] internal static extern bool IsChild(IntPtr parent, IntPtr child);
+    [DllImport("user32.dll")] internal static extern IntPtr GetAncestor(IntPtr hWnd, uint flags);
     [DllImport("user32.dll")] internal static extern bool GetWindowRect(IntPtr hWnd, out Rect rect);
     [DllImport("user32.dll")] internal static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] internal static extern bool BringWindowToTop(IntPtr hWnd);

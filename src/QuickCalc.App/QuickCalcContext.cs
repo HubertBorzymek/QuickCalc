@@ -143,12 +143,15 @@ internal sealed class QuickCalcContext : ApplicationContext
         else if (!target.InsertOrReplace(operation.Result!))
         {
             AddDiagnostic("Odmowa wstawienia: " + (target.LastFailureReason ??
-                "nie udało się bezpiecznie przywrócić celu lub zakresu zaznaczenia."));
+                "nie udało się bezpiecznie przywrócić celu lub zakresu zaznaczenia.") +
+                (target.LastInsertionDiagnostics is null ? "" : " Szczegóły: " + target.LastInsertionDiagnostics));
             _popup?.ShowOperationError("Nie udało się bezpiecznie przywrócić pola docelowego."); return;
         }
         else AddDiagnostic(target.LastFailureReason is null
-            ? "Wynik wstawiono do kontrolki docelowej."
-            : "Wynik wstawiono; ostrzeżenie: " + target.LastFailureReason);
+            ? "Wynik wstawiono do kontrolki docelowej." +
+              (target.LastInsertionDiagnostics is null ? "" : " Szczegóły: " + target.LastInsertionDiagnostics)
+            : "Wynik wstawiono; ostrzeżenie: " + target.LastFailureReason +
+              (target.LastInsertionDiagnostics is null ? "" : " Szczegóły: " + target.LastInsertionDiagnostics));
         ClosePopup();
     }
 
