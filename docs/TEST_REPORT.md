@@ -1,6 +1,6 @@
 # Raport testów QuickCalc
 
-Data: 2026-09-26
+Data: 2026-09-30
 
 ## Zaimplementowane
 
@@ -18,9 +18,9 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
-- `QuickCalc.Core.Tests`: 145 zaliczonych, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 29 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 175 przypadków, z czego 174 zaliczone i 1 pominięty.
+- `QuickCalc.Core.Tests`: 173 zaliczone, 0 niezaliczonych, 0 pominiętych;
+- `QuickCalc.Integration.Tests`: 30 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 204 przypadki, z czego 203 zaliczone i 1 pominięty.
 
 Testy klawiaturowego `Ctrl+C` i awaryjnego `Ctrl+V` wymagają wyłącznego prawa do okna pierwszoplanowego. W ostatnim pełnym przebiegu runner nie przyznał go testowi kopiowania, dlatego został oznaczony jako pominięty zamiast fałszywie pozytywnego. Test wklejenia i ponownego zaznaczenia przeszedł; oba przepływy mają także niezależne testy polityki i schowka.
 
@@ -33,6 +33,8 @@ Końcowy test przeglądarkowy wykrył właściwą przyczynę wcześniejszych odm
 Po kolejnym raporcie usunięto błędny warunek wymagający, aby dostawca UI Automation po utracie i odzyskaniu fokusu zwrócił identyczny tekst zaznaczenia. Zaznaczenie niestandardowych edytorów jest teraz dodatkowo wykrywane przez tymczasowe `Ctrl+C`, a wynik trafia do nich przez standardowe `Ctrl+V` z odtworzeniem wcześniejszego schowka. Test integracyjny wykrył i naprawił wyścig, w którym stary schowek mógł zostać przywrócony przed obsłużeniem `Ctrl+V`.
 
 Dodane regresje sprawdzają pełne zaznaczenie dłuższego wyniku, pozycję kursora po wstawieniu bez zaznaczenia, zachowanie odstępu przed jednostką, przedrostki SI i jednostki elektroniczne, potęgowanie `p`, pierwiastek `r` oraz zatwierdzenie z konwersją SI przez `Shift+Enter`. Parser sprawdza też zmienną zaznaczenia `x`, skróty względne, XOR `^`, wszystkie operatory bitowe, mieszanie DEC/HEX/BIN, dziedziczenie i wymuszanie formatu wyniku oraz niejednoznaczne zakończenia literałów HEX. Osobne testy obejmują pusty `Shift+Enter` z jednostką i odwrotność częstotliwości `2.5 kHz → 400 µs`.
+
+Kolejne regresje obejmują skrótowe operatory bitowe i `p` względem zaznaczenia, konwersję zaznaczenia przez samo `hex`/`bin`/`dec`, bitowy NOT `!`, odrzucenie `~`, `abs`, połączenie równoległe `||` dla skalarów i rezystancji oraz anulowanie popupu po utracie fokusu bez przywracania poprzedniego okna na pierwszy plan.
 
 Przebudowany popup jest objęty testami rzeczywistego formularza WinForms: borderless Compact, live preview, inline error ze zmianą wysokości, przełączanie Compact/Expanded z zachowaniem tekstu i fokusu, Enter, Shift+Enter dla jednostki oraz skalara, Escape, pozycja pod polem kontekstowym i pozycja przy kursorze w granicach monitora. Oba warianty zostały dodatkowo wyrenderowane i sprawdzone wizualnie. Aplikacja używa trybu DPI `PerMonitorV2`, a zmianę DPI obsługuje ponownym przeliczeniem układu i położenia.
 

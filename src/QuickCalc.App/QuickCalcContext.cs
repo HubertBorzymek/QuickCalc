@@ -12,6 +12,7 @@ internal sealed class QuickCalcContext : ApplicationContext
     private readonly ExpressionEvaluator _evaluator = new();
     private readonly ExpressionHistory _history = new();
     private readonly NotifyIcon _tray;
+    private readonly ToolStripMenuItem _closeOnFocusLossItem;
     private readonly List<string> _diagnosticLog = [];
     private readonly Dictionary<int, string> _hotkeyStatus = [];
     private CalculatorPopup? _popup;
@@ -24,6 +25,9 @@ internal sealed class QuickCalcContext : ApplicationContext
         menu.Items.Add("Kalkulator kontekstowy", null, (_, _) => Open(CalculatorMode.Context));
         menu.Items.Add("Kalkulator schowka", null, (_, _) => Open(CalculatorMode.Clipboard));
         menu.Items.Add("Diagnostyka…", null, (_, _) => ShowDiagnostics());
+        _closeOnFocusLossItem = new ToolStripMenuItem("Zamykaj popup po utracie fokusu") { CheckOnClick = true };
+        _closeOnFocusLossItem.CheckedChanged += (_, _) => SetCloseOnFocusLoss(_closeOnFocusLossItem.Checked);
+        menu.Items.Add(_closeOnFocusLossItem);
         menu.Items.Add("Wyczyść historię", null, (_, _) => _history.Clear());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Zakończ", null, (_, _) => ExitThread());
@@ -53,6 +57,7 @@ internal sealed class QuickCalcContext : ApplicationContext
         try
         {
             _settings = HotkeySettings.Load();
+            _closeOnFocusLossItem.Checked = _settings.ClosePopupOnFocusLoss;
             AddDiagnostic($"Wczytano konfigurację z: {_settings.SourcePath}");
             RegisterShortcut(1, "kontekstowy", _settings.ContextKey, _settings.ContextModifiers);
             RegisterShortcut(2, "schowka", _settings.ClipboardKey, _settings.ClipboardModifiers);
@@ -86,10 +91,15 @@ internal sealed class QuickCalcContext : ApplicationContext
     {
         var openingTimer = Stopwatch.StartNew();
         AddDiagnostic($"Rozpoczynam otwieranie trybu {mode}.");
-        if (_popup is { Visible: true })
+        if (_popup is { IsDisposed: false, Visible: true })
         {
             AddDiagnostic("Popup już istnieje — przenoszę go na bieżący ekran i aktywuję.");
             _popup.MoveToPreferredLocation(); _popup.BringToFront(); _popup.Activate(); return;
+        }
+        if (_popup is { IsDisposed: false })
+        {
+            AddDiagnostic("Usuwam ukryty popup przed otwarciem nowego.");
+            ClosePopup();
         }
 
         TargetContext target;
@@ -115,6 +125,7 @@ internal sealed class QuickCalcContext : ApplicationContext
         try
         {
             _popup = new CalculatorPopup(mode, target, _evaluator, _history);
+            _popup.CloseOnFocusLoss = _settings?.ClosePopupOnFocusLoss ?? false;
             _popup.OperationFinished += (_, operation) => Complete(target, operation);
             _popup.FormClosed += (_, _) => _popup = null;
             _popup.Show(); _popup.MoveToPreferredLocation(); _popup.BringToFront(); _popup.Activate();
@@ -132,7 +143,12 @@ internal sealed class QuickCalcContext : ApplicationContext
     private void Complete(TargetContext target, PopupOperation operation)
     {
         _popup?.Hide(); Application.DoEvents();
-        if (operation.Cancelled) { target.RestoreFocus(); ClosePopup(); return; }
+        if (operation.Cancelled)
+        {
+            if (operation.RestoreFocus) target.RestoreFocus();
+            ClosePopup();
+            return;
+        }
         if (operation.Mode == CalculatorMode.Clipboard)
         {
             try { Clipboard.SetText(operation.Result!); }
@@ -173,6 +189,20 @@ internal sealed class QuickCalcContext : ApplicationContext
         AddDiagnostic("Otwarto okno diagnostyczne.");
     }
 
+    private void SetCloseOnFocusLoss(bool enabled)
+    {
+        if (_settings is null) return;
+        if (_settings.ClosePopupOnFocusLoss == enabled)
+        {
+            if (_popup is not null) _popup.CloseOnFocusLoss = enabled;
+            return;
+        }
+        _settings = _settings with { ClosePopupOnFocusLoss = enabled };
+        _settings.Save();
+        if (_popup is not null) _popup.CloseOnFocusLoss = enabled;
+        AddDiagnostic($"Zamykanie popupu po utracie fokusu: {(enabled ? "włączone" : "wyłączone")}.");
+    }
+
     private string BuildDiagnosticReport()
     {
         var process = Process.GetCurrentProcess();
@@ -197,7 +227,9 @@ internal sealed class QuickCalcContext : ApplicationContext
     private string ApplyHotkeys(HotkeyEditorValues values)
     {
         HotkeySettings requested;
-        try { requested = HotkeySettings.FromValues(values, _settings?.SourcePath ?? Path.Combine(AppContext.BaseDirectory, "hotkeys.json")); }
+        try { requested = HotkeySettings.FromValues(values,
+            _settings?.SourcePath ?? Path.Combine(AppContext.BaseDirectory, "hotkeys.json"),
+            _settings?.ClosePopupOnFocusLoss ?? false); }
         catch (Exception ex) { AddDiagnostic("Odrzucono konfigurację skrótów: " + ex.Message); return "Błąd: " + ex.Message; }
 
         var previous = _settings;
@@ -247,22 +279,27 @@ internal sealed class QuickCalcContext : ApplicationContext
     }
 }
 
-internal sealed record HotkeySettings(Keys ContextKey, HotkeyModifiers ContextModifiers, Keys ClipboardKey, HotkeyModifiers ClipboardModifiers, string SourcePath)
+internal sealed record HotkeySettings(Keys ContextKey, HotkeyModifiers ContextModifiers, Keys ClipboardKey,
+    HotkeyModifiers ClipboardModifiers, string SourcePath, bool ClosePopupOnFocusLoss = false)
 {
-    private sealed record JsonSettings(string ContextKey = "F16", string ContextModifiers = "None", string ClipboardKey = "F16", string ClipboardModifiers = "Control");
+    private sealed record JsonSettings(string ContextKey = "F16", string ContextModifiers = "None",
+        string ClipboardKey = "F16", string ClipboardModifiers = "Control", bool ClosePopupOnFocusLoss = false);
     public static HotkeySettings Load()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "hotkeys.json");
         var dto = File.Exists(path) ? JsonSerializer.Deserialize<JsonSettings>(File.ReadAllText(path)) ?? new() : new();
-        return new(ParseKey(dto.ContextKey), ParseModifiers(dto.ContextModifiers), ParseKey(dto.ClipboardKey), ParseModifiers(dto.ClipboardModifiers), path);
+        return new(ParseKey(dto.ContextKey), ParseModifiers(dto.ContextModifiers), ParseKey(dto.ClipboardKey),
+            ParseModifiers(dto.ClipboardModifiers), path, dto.ClosePopupOnFocusLoss);
     }
-    public static HotkeySettings FromValues(HotkeyEditorValues values, string path) => new(
+    public static HotkeySettings FromValues(HotkeyEditorValues values, string path, bool closePopupOnFocusLoss = false) => new(
         ParseKey(values.ContextKey), ParseModifiers(values.ContextModifiers),
-        ParseKey(values.ClipboardKey), ParseModifiers(values.ClipboardModifiers), path);
+        ParseKey(values.ClipboardKey), ParseModifiers(values.ClipboardModifiers), path, closePopupOnFocusLoss);
 
     public void Save()
     {
-        var json = JsonSerializer.Serialize(new JsonSettings(ContextKey.ToString(), FormatModifiers(ContextModifiers), ClipboardKey.ToString(), FormatModifiers(ClipboardModifiers)), new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(new JsonSettings(ContextKey.ToString(), FormatModifiers(ContextModifiers),
+            ClipboardKey.ToString(), FormatModifiers(ClipboardModifiers), ClosePopupOnFocusLoss),
+            new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(SourcePath, json + Environment.NewLine);
     }
 

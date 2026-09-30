@@ -30,7 +30,7 @@ Domyślne skróty:
 - `Shift+Enter` — zatwierdzenie z konwersją do czytelnej jednostki SI.
 - `Escape` — anulowanie bez zmiany tekstu i schowka.
 
-Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Nie rejestruje autostartu.
+Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Opcja **Zamykaj popup po utracie fokusu** automatycznie anuluje i zamyka kalkulator po kliknięciu innego okna, bez odbierania mu fokusu; ustawienie jest zapamiętywane. Nie rejestruje autostartu.
 
 Popup domyślnie otwiera się jako ciemny, półprzezroczysty pasek **Compact** bez systemowego paska tytułu. Pokazuje zaznaczoną wartość, pole wyrażenia i wynik aktualizowany podczas pisania. Ponowne naciśnięcie `F16`, gdy popup jest otwarty, przełącza **Compact ↔ Expanded** bez kasowania wyrażenia ani utraty fokusu. Widok Expanded dodaje tryb pracy, zaznaczenie, rodzaj działania, historię, skróty oraz błąd parsera. Zwykłe błędy są pokazywane wewnątrz popupu, bez MessageBoxów.
 
@@ -50,7 +50,9 @@ Obsługiwane są `+`, `-`, `*`, `/`, potęgowanie `p`, nawiasy, znaki jednoargum
 
 Litera `x` oznacza zaznaczoną wartość, dlatego działają pełne wyrażenia, np. `-x`, `1/x`, `xp2` i `(x+5)/2`. Zachowane są skróty względne: `+5`, `-5`, `*2`, `/2`, samo `r`, `ln` i `log`. Bez zaznaczenia użycie `x` albo skrótu względnego powoduje czytelny błąd. Potęgowanie zapisuje się przez `p`, np. `2p8 = 256`; znak `^` oznacza teraz XOR.
 
-Dostępne są operatory całkowitoliczbowe `&`, `|`, `^`, `~`, `<<` i `>>`. Nie przyjmują liczb zmiennoprzecinkowych ani wartości z jednostką. Literały dziesiętne, szesnastkowe i binarne można mieszać, np. `10+0x10` i `0b1000+0x10`. Wynik dziedziczy format zaznaczenia, a bez zaznaczenia — pierwszego literału; wynik niecałkowity jest zawsze dziesiętny. Format całego wyniku można wymusić końcowym `h`/`hex`, `b`/`bin` albo `d`/`dec`, ze spacją lub bez. Pełny literał HEX ma pierwszeństwo, więc `0xABCD` pozostaje liczbą, natomiast `0xABCD d` wymusza DEC.
+Dostępne są operatory całkowitoliczbowe `&`, `|`, `^`, `!`, `<<` i `>>`; `!` jest bitowym NOT i może obejmować całe wyrażenie, np. `!(0b11)`. Nie przyjmują liczb zmiennoprzecinkowych ani wartości z jednostką. Literały dziesiętne, szesnastkowe i binarne można mieszać, np. `10+0x10` i `0b1000+0x10`. Wynik dziedziczy format zaznaczenia, a bez zaznaczenia — pierwszego literału; wynik niecałkowity jest zawsze dziesiętny. Format całego wyniku można wymusić końcowym `h`/`hex`, `b`/`bin` albo `d`/`dec`, ze spacją lub bez. Wpisanie samego `hex`, `bin` albo `dec` konwertuje zaznaczoną liczbę bez zmiany wartości. Pełny literał HEX ma pierwszeństwo, więc `0xABCD` pozostaje liczbą, natomiast `0xABCD d` wymusza DEC.
+
+Funkcja `abs` zwraca wartość bezwzględną (`abs(-5)`, `abs(x)` lub samo `abs` dla zaznaczenia). Operator `||` oblicza połączenie równoległe: `R1*R2/(R1+R2)`. Działa dla dwóch skalarów lub rezystancji, również skrótowo, np. zaznaczone `100Ω` i `||100` daje `50Ω`.
 
 Parser obsługuje jednostki bazowe SI i ich przedrostki (m.in. `m`, `kg`, `s`, `A`, `K`, `mol`, `cd`) oraz jednostki używane w elektronice i technice: `V`, `Ω`/`ohm`, `F`, `H`, `Hz`, `W`, `N`, `Pa`, `J`, `C`, `S`, `Wb`, `T`. Dostępne są również `in`/`inch`, `ft`, `yd`, `mi`, `mil`, `min` i `hr`/`hour`/`hours`. Przedrostek `u` jest przyjmowany jako łatwy do wpisania odpowiednik `µ`. Samo `h` jest zarezerwowane jako suffix wyniku HEX.
 

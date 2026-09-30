@@ -97,6 +97,13 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("rx")]
     [DataRow("lnx")]
     [DataRow("(x+5)/2")]
+    [DataRow("p2")]
+    [DataRow("^1")]
+    [DataRow("&1")]
+    [DataRow("|1")]
+    [DataRow("<<1")]
+    [DataRow(">>1")]
+    [DataRow("hex")]
     public void RelativeOperationRequiresSelection(string expression)
         => Assert.ThrowsExactly<CalculationException>(() => _sut.Evaluate(expression));
 
@@ -122,7 +129,7 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("6&3", "2")]
     [DataRow("4|1", "5")]
     [DataRow("7^3", "4")]
-    [DataRow("~5", "-6")]
+    [DataRow("!5", "-6")]
     [DataRow("1<<4", "16")]
     [DataRow("16>>2", "4")]
     [DataRow("1|2&4", "1")]
@@ -186,6 +193,51 @@ public sealed class ExpressionEvaluatorTests
     [DataRow("0xABCD dec", "43981")]
     public void CompleteHexLiteralWinsOverUnspacedSuffix(string expression, string expected)
         => Assert.AreEqual(expected, _sut.Evaluate(expression).Text);
+
+    [TestMethod]
+    [DataRow("^0x00", "0xF0", "0xF0")]
+    [DataRow("&0b11", "0b11110000", "0b0")]
+    [DataRow("|0b11", "0b11110000", "0b11110011")]
+    [DataRow("<<2", "0b11", "0b1100")]
+    [DataRow("p2", "234", "54756")]
+    public void BitwiseAndPowerOperatorsCanUseRelativeShortcut(
+        string expression, string selection, string expected)
+        => Assert.AreEqual(expected, _sut.Evaluate(expression, selection).Text);
+
+    [TestMethod]
+    [DataRow("hex", "123", "0x7B")]
+    [DataRow("h", "123", "0x7B")]
+    [DataRow("hex", "0b11110000", "0xF0")]
+    [DataRow("bin", "0xF0", "0b11110000")]
+    [DataRow("b", "0xF0", "0b11110000")]
+    [DataRow("dec", "0xF0", "240")]
+    [DataRow("d", "0xF0", "240")]
+    public void StandaloneFormatNameConvertsSelectedInteger(
+        string expression, string selection, string expected)
+        => Assert.AreEqual(expected, _sut.Evaluate(expression, selection).Text);
+
+    [TestMethod]
+    [DataRow("!0b11", "-0b100")]
+    [DataRow("!(0b11)", "-0b100")]
+    [DataRow("abs(-5)", "5")]
+    public void EvaluatesNotAndAbsoluteValue(string expression, string expected)
+        => Assert.AreEqual(expected, _sut.Evaluate(expression).Text);
+
+    [TestMethod]
+    public void AbsoluteValueCanUseSelectedValue()
+        => Assert.AreEqual("5", _sut.Evaluate("abs", "-5").Text);
+
+    [TestMethod]
+    public void TildeIsNotAcceptedAsNotOperator()
+        => Assert.ThrowsExactly<CalculationException>(() => _sut.Evaluate("~0b11"));
+
+    [TestMethod]
+    [DataRow("100||100", null, "50")]
+    [DataRow("100Ω||100Ω", null, "50Ω")]
+    [DataRow("x||100Ω", "100Ω", "50Ω")]
+    [DataRow("||100", "100Ω", "50Ω")]
+    public void CalculatesParallelResistance(string expression, string? selection, string expected)
+        => Assert.AreEqual(expected, _sut.Evaluate(expression, selection).Text);
 
     [TestMethod]
     public void ReciprocalFrequencyConvertsToReadableSiTime()

@@ -111,6 +111,25 @@ public sealed class CalculatorPopupTests
     }
 
     [STATestMethod]
+    public void EnabledFocusLossOptionCancelsPopup()
+    {
+        using var popup = new CalculatorPopup(CalculatorMode.Context,
+            new TargetContext((IntPtr)1, (IntPtr)1, null, null, "25", "test"),
+            new ExpressionEvaluator(), new ExpressionHistory())
+        {
+            CloseOnFocusLoss = true
+        };
+        PopupOperation? completed = null;
+        popup.OperationFinished += (_, operation) => completed = operation;
+
+        popup.HandleFocusLoss();
+
+        Assert.IsNotNull(completed);
+        Assert.IsTrue(completed.Cancelled);
+        Assert.IsFalse(completed.RestoreFocus);
+    }
+
+    [STATestMethod]
     public void EscapeCancelsWithoutReturningAResult()
     {
         using var popup = new CalculatorPopup(CalculatorMode.Context,

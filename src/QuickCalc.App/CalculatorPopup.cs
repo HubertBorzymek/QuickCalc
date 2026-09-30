@@ -1,12 +1,14 @@
 using QuickCalc.Core;
 using QuickCalc.Windows;
+using System.ComponentModel;
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 
 namespace QuickCalc.App;
 
 internal enum CalculatorMode { Context, Clipboard }
-internal sealed record PopupOperation(CalculatorMode Mode, bool Cancelled, string? Result = null);
+internal sealed record PopupOperation(CalculatorMode Mode, bool Cancelled, string? Result = null,
+    bool RestoreFocus = true);
 
 internal sealed class CalculatorPopup : Form
 {
@@ -43,9 +45,16 @@ internal sealed class CalculatorPopup : Form
     private bool _historyNavigation;
     private bool _completionRaised;
     private bool _expanded;
+    private bool _closeOnFocusLoss;
 
     public event EventHandler<PopupOperation>? OperationFinished;
     internal bool IsExpanded => _expanded;
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    internal bool CloseOnFocusLoss
+    {
+        get => _closeOnFocusLoss;
+        set => _closeOnFocusLoss = value;
+    }
 
     public CalculatorPopup(CalculatorMode mode, TargetContext target, ExpressionEvaluator evaluator, ExpressionHistory history)
     {
@@ -113,6 +122,15 @@ internal sealed class CalculatorPopup : Form
         {
             ApplyLayout();
             MoveToPreferredLocation();
+        };
+        Deactivate += (_, _) =>
+        {
+            if (!_closeOnFocusLoss || _completionRaised || !Visible || IsDisposed) return;
+            BeginInvoke(() =>
+            {
+                if (_closeOnFocusLoss && !_completionRaised && Visible && !ContainsFocus)
+                    HandleFocusLoss();
+            });
         };
         FormClosing += (_, e) =>
         {
@@ -229,6 +247,11 @@ internal sealed class CalculatorPopup : Form
         FocusExpression();
         var safeStart = Math.Min(selectionStart, _expression.TextLength);
         _expression.Select(safeStart, Math.Min(selectionLength, _expression.TextLength - safeStart));
+    }
+
+    internal void HandleFocusLoss()
+    {
+        if (_closeOnFocusLoss && !_completionRaised) Finish(new(_mode, true, RestoreFocus: false));
     }
 
     private void NavigateHistory(string? value)

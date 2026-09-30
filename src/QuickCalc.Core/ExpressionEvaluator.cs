@@ -61,6 +61,10 @@ public sealed class ExpressionEvaluator
         if (text[0] == '+' && StartsNumericOperand(text, 1)) return "x" + text;
         if (text[0] is '*' or '/') return "x" + text;
         if (text[0] == '-' && StartsNumericOperand(text, 1)) return "x" + text;
+        if ((text[0] == 'p' && StartsUnaryOperand(text, 1)) || text[0] is '^' or '&' or '|' ||
+            text.StartsWith("<<", StringComparison.Ordinal) ||
+            text.StartsWith(">>", StringComparison.Ordinal)) return "x" + text;
+        if (text == "!") return "!x";
 
         var functionLength = RelativeFunctionLength(text);
         if (functionLength == 0) return text;
@@ -77,9 +81,17 @@ public sealed class ExpressionEvaluator
         return position < text.Length && (char.IsDigit(text[position]) || text[position] is '.' or ',');
     }
 
+    private static bool StartsUnaryOperand(string text, int position)
+    {
+        while (position < text.Length && char.IsWhiteSpace(text[position])) position++;
+        return position < text.Length && (char.IsDigit(text[position]) ||
+            text[position] is '.' or ',' or '(' or '+' or '-' or '!' or 'r' or '√' or 'x');
+    }
+
     private static int RelativeFunctionLength(string text)
     {
-        if (text.StartsWith("log", StringComparison.OrdinalIgnoreCase)) return 3;
+        if (text.StartsWith("log", StringComparison.OrdinalIgnoreCase) ||
+            text.StartsWith("abs", StringComparison.OrdinalIgnoreCase)) return 3;
         if (text.StartsWith("ln", StringComparison.OrdinalIgnoreCase)) return 2;
         return text[0] is 'r' or '√' ? 1 : 0;
     }
@@ -95,6 +107,11 @@ public sealed class ExpressionEvaluator
 
         foreach (var (token, format) in suffixes)
         {
+            if (text.Equals(token, StringComparison.Ordinal))
+            {
+                text = "x";
+                return format;
+            }
             if (!text.EndsWith(token, StringComparison.Ordinal)) continue;
             var start = text.Length - token.Length;
             if (start <= 0 || !char.IsWhiteSpace(text[start - 1])) continue;
@@ -181,10 +198,21 @@ public sealed class ExpressionEvaluator
 
         public Quantity Parse()
         {
-            var value = ParseBitwiseOr();
+            var value = ParseParallel();
             SkipWhite();
             if (_position != text.Length) throw Error("Nieobsługiwana składnia");
             return value;
+        }
+
+        private Quantity ParseParallel()
+        {
+            var value = ParseBitwiseOr();
+            while (true)
+            {
+                SkipWhite();
+                if (!Take("||")) return value;
+                value = ApplyParallel(value, ParseBitwiseOr());
+            }
         }
 
         private Quantity ParseBitwiseOr()
@@ -193,6 +221,7 @@ public sealed class ExpressionEvaluator
             while (true)
             {
                 SkipWhite();
+                if (StartsWith("||", StringComparison.Ordinal)) return value;
                 if (!Take('|')) return value;
                 value = ApplyBitwise('|', value, ParseBitwiseXor());
             }
@@ -261,7 +290,12 @@ public sealed class ExpressionEvaluator
             SkipWhite();
             if (Take('+')) return ParseUnary();
             if (Take('-')) { var value = ParseUnary(); return value with { BaseValue = -value.BaseValue }; }
-            if (Take('~')) return Quantity.Scalar(~RequireInteger(ParseUnary()));
+            if (Take('!')) return Quantity.Scalar(~RequireInteger(ParseUnary()));
+            if (TakeWord("abs"))
+            {
+                var value = ParseUnary();
+                return value with { BaseValue = Math.Abs(value.BaseValue) };
+            }
             if (TakeWord("ln")) return ApplyLogarithm(ParseUnary(), natural: true);
             if (TakeWord("log")) return ApplyLogarithm(ParseUnary(), natural: false);
             if (Take('r') || Take('√'))
@@ -306,7 +340,7 @@ public sealed class ExpressionEvaluator
             if (TakeWord("e")) return Quantity.Scalar(Math.E);
             if (Take('('))
             {
-                var value = ParseBitwiseOr();
+                var value = ParseParallel();
                 SkipWhite();
                 if (!Take(')')) throw Error("Brak zamykającego nawiasu");
                 return value;
@@ -383,7 +417,7 @@ public sealed class ExpressionEvaluator
             position++;
             while (position < text.Length && char.IsWhiteSpace(text[position])) position++;
             return position < text.Length && (char.IsDigit(text[position]) ||
-                text[position] is '.' or ',' or 'x' or '(' or '+' or '-' or '~' or 'r' or '√');
+                text[position] is '.' or ',' or 'x' or '(' or '+' or '-' or '!' or 'r' or '√');
         }
 
         private Quantity ApplyArithmetic(char op, Quantity left, Quantity right)
@@ -436,6 +470,28 @@ public sealed class ExpressionEvaluator
                 '|' => leftInteger | rightInteger,
                 _ => throw Error("Nieobsługiwany operator bitowy")
             });
+        }
+
+        private Quantity ApplyParallel(Quantity left, Quantity right)
+        {
+            if (left.Dimension != right.Dimension)
+            {
+                var unit = selection?.Unit is not null && Units.Resolve(selection.Unit).Dimension == Dimension.Resistance
+                    ? Units.Resolve(selection.Unit)
+                    : FirstUnit is not null && Units.Resolve(FirstUnit).Dimension == Dimension.Resistance
+                        ? Units.Resolve(FirstUnit)
+                        : null;
+                if (unit is not null && left.Dimension == Dimension.Resistance && right.Dimension == Dimension.Scalar)
+                    right = Quantity.Of(right.BaseValue * unit.ToBaseFactor, Dimension.Resistance);
+                else if (unit is not null && left.Dimension == Dimension.Scalar && right.Dimension == Dimension.Resistance)
+                    left = Quantity.Of(left.BaseValue * unit.ToBaseFactor, Dimension.Resistance);
+                else throw Error("Połączenie równoległe wymaga dwóch rezystancji albo dwóch skalarów");
+            }
+            if (left.Dimension is not (Dimension.Scalar or Dimension.Resistance))
+                throw Error("Operator || obsługuje tylko rezystancje albo skalary");
+            var denominator = left.BaseValue + right.BaseValue;
+            if (denominator == 0) throw Error("Połączenie równoległe ma zerową sumę rezystancji");
+            return Quantity.Of(left.BaseValue * right.BaseValue / denominator, left.Dimension);
         }
 
         private Quantity ApplyShift(bool left, Quantity value, Quantity countValue)
