@@ -40,8 +40,8 @@ internal sealed class CalculatorPopup : Form
     private readonly Label _preview = new();
     private readonly Label _modeDetails = new();
     private readonly Label _resultDetails = new();
-    private readonly Label[] _operatorCategories = [new(), new(), new(), new(), new()];
-    private readonly Label[] _operatorDescriptions = [new(), new(), new(), new(), new()];
+    private readonly Label[] _operatorCategories = [new(), new(), new(), new()];
+    private readonly Label[] _operatorDescriptions = [new(), new(), new(), new()];
     private readonly Label _historyDetails = new();
     private readonly Label _controlsHint = new();
     private readonly Label _error = new();
@@ -351,10 +351,10 @@ internal sealed class CalculatorPopup : Form
         _historyDetails.Text = _history.Items.Count == 0
             ? "Historia: brak"
             : "Ostatnie: " + Shorten(_history.Items[^1], 40);
-        string[] categories = ["MATEMATYKA", "LOGARYTMY", "BITOWE", "FORMATY", "KONTEKST"];
+        string[] categories = ["FUNKCJE", "BITOWE", "FORMATY", "KONTEKST"];
         string[] descriptions =
         [
-            "p — potęgowanie   ·   r — pierwiastek   ·   abs — wartość bezwzględna",
+            "p — potęgowanie   ·   r — pierwiastek   ·   abs — wartość bezwzględna\n" +
             "ln — naturalny   ·   log — dziesiętny",
             "& AND   ·   | OR   ·   ^ XOR   ·   ! NOT   ·   << / >> — przesunięcie",
             "hex / bin / dec — format wyniku   ·   u2 — kod U2 na DEC",
@@ -403,10 +403,11 @@ internal sealed class CalculatorPopup : Form
             var categoryWidth = ScalePx(82);
             for (var index = 0; index < _operatorCategories.Length; index++)
             {
-                var rowTop = ScalePx(108 + index * 20);
-                _operatorCategories[index].SetBounds(detailLeft, rowTop, categoryWidth, ScalePx(18));
+                var rowTop = ScalePx(index == 0 ? 108 : 128 + index * 20);
+                var operatorRowHeight = ScalePx(index == 0 ? 38 : 18);
+                _operatorCategories[index].SetBounds(detailLeft, rowTop, categoryWidth, operatorRowHeight);
                 _operatorDescriptions[index].SetBounds(detailLeft + categoryWidth, rowTop,
-                    detailWidth - categoryWidth, ScalePx(18));
+                    detailWidth - categoryWidth, operatorRowHeight);
             }
             _historyDetails.SetBounds(detailLeft, ScalePx(212), detailWidth, ScalePx(17));
             _controlsHint.SetBounds(detailLeft, ScalePx(234), detailWidth, ScalePx(18));

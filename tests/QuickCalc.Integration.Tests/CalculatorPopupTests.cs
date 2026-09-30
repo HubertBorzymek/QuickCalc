@@ -253,9 +253,11 @@ public sealed class CalculatorPopupTests
                 Assert.IsTrue(input.Focused);
                 Assert.IsTrue(popup.Controls.OfType<Label>().Any(label => label.Text.Contains("Shift+Enter — SI")));
                 Assert.IsTrue(popup.Controls.OfType<Label>().Any(label =>
-                    label.Visible && label.Text == "MATEMATYKA"));
+                    label.Visible && label.Text == "FUNKCJE"));
                 Assert.IsTrue(popup.Controls.OfType<Label>().Any(label =>
-                    label.Visible && label.Text.Contains("p — potęgowanie") && label.Text.Contains("r — pierwiastek")));
+                    label.Visible && label.Text.Contains("p — potęgowanie") &&
+                    label.Text.Contains("r — pierwiastek") && label.Text.Contains("ln — naturalny") &&
+                    label.Text.Contains("log — dziesiętny")));
                 Assert.IsTrue(popup.Controls.OfType<Label>().Any(label =>
                     label.Visible && label.Text.Contains("u2 — kod U2 na DEC")));
                 Assert.IsTrue(popup.Controls.OfType<Label>().Any(label =>
