@@ -30,7 +30,7 @@ Domyślne skróty:
 - `Shift+Enter` — zatwierdzenie z konwersją do czytelnej jednostki SI.
 - `Escape` — anulowanie bez zmiany tekstu i schowka.
 
-Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Opcja **Zamykaj popup po utracie fokusu** automatycznie anuluje i zamyka kalkulator po kliknięciu innego okna, bez odbierania mu fokusu; ustawienie jest zapamiętywane. Nie rejestruje autostartu.
+Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Opcja **Zamykaj popup po utracie fokusu** automatycznie anuluje i zamyka kalkulator po kliknięciu innego okna, bez odbierania mu fokusu; ustawienie jest zapamiętywane. **Resetuj popupy** awaryjnie zamyka wszystkie okna kalkulatora. Niezależny strażnik okresowo wykrywa duplikaty i pozostawia tylko jeden popup. Program nie rejestruje autostartu.
 
 Popup domyślnie otwiera się jako ciemny, półprzezroczysty pasek **Compact** bez systemowego paska tytułu. Pokazuje zaznaczoną wartość, pole wyrażenia i wynik aktualizowany podczas pisania. Ponowne naciśnięcie `F16`, gdy popup jest otwarty, przełącza **Compact ↔ Expanded** bez kasowania wyrażenia ani utraty fokusu. Widok Expanded dodaje tryb pracy, zaznaczenie, wynik, historię, sterowanie oraz krótką ściągę mniej oczywistych operatorów. Zwykłe błędy są pokazywane wewnątrz popupu, bez MessageBoxów.
 

@@ -262,12 +262,49 @@ public sealed class CalculatorPopupTests
                     label.Visible && label.Text.Contains("u2 — kod U2 na DEC")));
                 Assert.IsTrue(popup.Controls.OfType<Label>().Any(label =>
                     label.Visible && label.Text.Contains("|| — rezystory równolegle")));
+                Assert.IsTrue(popup.Controls.OfType<Label>().Any(label =>
+                    label.Visible && !label.UseMnemonic && label.Text.Contains("& AND")));
 
                 popup.ToggleExpanded(); Application.DoEvents();
                 Assert.IsFalse(popup.IsExpanded);
                 Assert.AreEqual(compactHeight, popup.Height);
                 Assert.AreEqual("+10", input.Text);
                 popup.Close(); popup.Close();
+            }
+            catch (Exception ex) { failure = ex; }
+            finally { done.Set(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA); thread.Start();
+        Assert.IsTrue(done.Wait(TimeSpan.FromSeconds(10)));
+        if (failure is not null) throw failure;
+    }
+
+    [TestMethod]
+    public void PopupRegistryRemovesDuplicatesAndResetClosesEverything()
+    {
+        Exception? failure = null;
+        using var done = new ManualResetEventSlim();
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var first = new CalculatorPopup(CalculatorMode.Clipboard,
+                    new TargetContext(IntPtr.Zero, IntPtr.Zero, null, null, null, "test"),
+                    new ExpressionEvaluator(), new ExpressionHistory());
+                using var second = new CalculatorPopup(CalculatorMode.Clipboard,
+                    new TargetContext(IntPtr.Zero, IntPtr.Zero, null, null, null, "test"),
+                    new ExpressionEvaluator(), new ExpressionHistory());
+                first.Show();
+                second.Show();
+                Application.DoEvents();
+
+                Assert.AreSame(second, CalculatorPopup.KeepSingleOpen(second));
+                Application.DoEvents();
+                Assert.IsTrue(first.IsDisposed || !first.Visible);
+                Assert.IsTrue(second.Visible);
+                Assert.AreEqual(1, CalculatorPopup.CloseAllOpenPopups());
+                Application.DoEvents();
+                Assert.IsTrue(second.IsDisposed || !second.Visible);
             }
             catch (Exception ex) { failure = ex; }
             finally { done.Set(); }

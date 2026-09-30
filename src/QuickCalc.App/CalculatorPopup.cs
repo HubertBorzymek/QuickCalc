@@ -59,6 +59,35 @@ internal sealed class CalculatorPopup : Form
         set => _closeOnFocusLoss = value;
     }
 
+    internal static CalculatorPopup? KeepSingleOpen(CalculatorPopup? preferred = null)
+    {
+        var open = Application.OpenForms.OfType<CalculatorPopup>()
+            .Where(popup => !popup.IsDisposed).ToArray();
+        if (open.Length == 0) return null;
+        var keep = preferred is { IsDisposed: false, Visible: true } && open.Contains(preferred)
+            ? preferred
+            : open.LastOrDefault(popup => popup.Visible) ?? open[^1];
+        foreach (var popup in open)
+            if (!ReferenceEquals(popup, keep)) popup.CloseImmediately();
+        return keep;
+    }
+
+    internal static int CloseAllOpenPopups()
+    {
+        var open = Application.OpenForms.OfType<CalculatorPopup>()
+            .Where(popup => !popup.IsDisposed).ToArray();
+        foreach (var popup in open) popup.CloseImmediately();
+        return open.Length;
+    }
+
+    internal void CloseImmediately()
+    {
+        if (IsDisposed) return;
+        _completionRaised = true;
+        Close();
+        if (!IsDisposed) Dispose();
+    }
+
     public CalculatorPopup(CalculatorMode mode, TargetContext target, ExpressionEvaluator evaluator, ExpressionHistory history)
     {
         _mode = mode;
@@ -457,6 +486,7 @@ internal sealed class CalculatorPopup : Form
         label.BackColor = Surface;
         label.ForeColor = color;
         label.Font = UiFont(size, style);
+        label.UseMnemonic = false;
         label.AutoEllipsis = true;
         label.TextAlign = ContentAlignment.MiddleLeft;
     }

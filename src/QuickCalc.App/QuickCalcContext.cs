@@ -13,6 +13,7 @@ internal sealed class QuickCalcContext : ApplicationContext
     private readonly ExpressionHistory _history = new();
     private readonly NotifyIcon _tray;
     private readonly ToolStripMenuItem _closeOnFocusLossItem;
+    private readonly System.Windows.Forms.Timer _popupGuard = new() { Interval = 750 };
     private readonly List<string> _diagnosticLog = [];
     private readonly Dictionary<int, string> _hotkeyStatus = [];
     private CalculatorPopup? _popup;
@@ -28,16 +29,20 @@ internal sealed class QuickCalcContext : ApplicationContext
         _closeOnFocusLossItem = new ToolStripMenuItem("Zamykaj popup po utracie fokusu") { CheckOnClick = true };
         _closeOnFocusLossItem.CheckedChanged += (_, _) => SetCloseOnFocusLoss(_closeOnFocusLossItem.Checked);
         menu.Items.Add(_closeOnFocusLossItem);
+        menu.Items.Add("Resetuj popupy", null, (_, _) => ResetPopups());
         menu.Items.Add("Wyczyść historię", null, (_, _) => _history.Clear());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Zakończ", null, (_, _) => ExitThread());
         _tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "QuickCalc — F16: kontekst, Ctrl+F16: schowek", ContextMenuStrip = menu, Visible = true };
         _tray.DoubleClick += (_, _) => Open(CalculatorMode.Clipboard);
+        _popupGuard.Tick += (_, _) => EnsureSinglePopup();
+        _popupGuard.Start();
         _hotkeys.Pressed += (_, id) =>
         {
             try
             {
                 AddDiagnostic($"Odebrano WM_HOTKEY, identyfikator {id}.");
+                EnsureSinglePopup();
                 if (id == 1 && _popup is { Visible: true })
                 {
                     _popup.ToggleExpanded();
@@ -91,6 +96,7 @@ internal sealed class QuickCalcContext : ApplicationContext
     {
         var openingTimer = Stopwatch.StartNew();
         AddDiagnostic($"Rozpoczynam otwieranie trybu {mode}.");
+        EnsureSinglePopup();
         if (_popup is { IsDisposed: false, Visible: true })
         {
             AddDiagnostic("Popup już istnieje — przenoszę go na bieżący ekran i aktywuję.");
@@ -124,11 +130,16 @@ internal sealed class QuickCalcContext : ApplicationContext
         AddDiagnostic($"Otwarcie trybu {mode}; cel=0x{target.WindowHandle.ToInt64():X}, kontrolka=0x{target.ControlHandle.ToInt64():X}, metoda={target.DetectionMethod}, zaznaczenie={target.HasSelection}, poprawny={target.IsValid}, przechwycenie={openingTimer.ElapsedMilliseconds} ms.");
         try
         {
-            _popup = new CalculatorPopup(mode, target, _evaluator, _history);
-            _popup.CloseOnFocusLoss = _settings?.ClosePopupOnFocusLoss ?? false;
-            _popup.OperationFinished += (_, operation) => Complete(target, operation);
-            _popup.FormClosed += (_, _) => _popup = null;
-            _popup.Show(); _popup.MoveToPreferredLocation(); _popup.BringToFront(); _popup.Activate();
+            var popup = new CalculatorPopup(mode, target, _evaluator, _history);
+            _popup = popup;
+            popup.CloseOnFocusLoss = _settings?.ClosePopupOnFocusLoss ?? false;
+            popup.OperationFinished += (_, operation) => Complete(popup, target, operation);
+            popup.FormClosed += (_, _) =>
+            {
+                if (ReferenceEquals(_popup, popup)) _popup = null;
+            };
+            popup.Show(); popup.MoveToPreferredLocation(); popup.BringToFront(); popup.Activate();
+            EnsureSinglePopup();
             AddDiagnostic($"Popup pokazany po {openingTimer.ElapsedMilliseconds} ms: uchwyt=0x{_popup.Handle.ToInt64():X}, Visible={_popup.Visible}, Bounds={_popup.Bounds}.");
         }
         catch (Exception ex)
@@ -140,19 +151,19 @@ internal sealed class QuickCalcContext : ApplicationContext
         }
     }
 
-    private void Complete(TargetContext target, PopupOperation operation)
+    private void Complete(CalculatorPopup source, TargetContext target, PopupOperation operation)
     {
-        _popup?.Hide(); Application.DoEvents();
+        source.Hide(); Application.DoEvents();
         if (operation.Cancelled)
         {
             if (operation.RestoreFocus) target.RestoreFocus();
-            ClosePopup();
+            ClosePopup(source);
             return;
         }
         if (operation.Mode == CalculatorMode.Clipboard)
         {
             try { Clipboard.SetText(operation.Result!); }
-            catch (ExternalException ex) { AddDiagnostic("Błąd schowka: " + ex); _popup?.ShowOperationError("Nie można teraz zapisać do schowka."); return; }
+            catch (ExternalException ex) { AddDiagnostic("Błąd schowka: " + ex); source.ShowOperationError("Nie można teraz zapisać do schowka."); return; }
             target.RestoreFocus();
             AddDiagnostic("Wynik zapisano w schowku, przywrócono fokus.");
         }
@@ -161,23 +172,37 @@ internal sealed class QuickCalcContext : ApplicationContext
             AddDiagnostic("Odmowa wstawienia: " + (target.LastFailureReason ??
                 "nie udało się bezpiecznie przywrócić celu lub zakresu zaznaczenia.") +
                 (target.LastInsertionDiagnostics is null ? "" : " Szczegóły: " + target.LastInsertionDiagnostics));
-            _popup?.ShowOperationError("Nie udało się bezpiecznie przywrócić pola docelowego."); return;
+            source.ShowOperationError("Nie udało się bezpiecznie przywrócić pola docelowego."); return;
         }
         else AddDiagnostic(target.LastFailureReason is null
             ? "Wynik wstawiono do kontrolki docelowej." +
               (target.LastInsertionDiagnostics is null ? "" : " Szczegóły: " + target.LastInsertionDiagnostics)
             : "Wynik wstawiono; ostrzeżenie: " + target.LastFailureReason +
               (target.LastInsertionDiagnostics is null ? "" : " Szczegóły: " + target.LastInsertionDiagnostics));
-        ClosePopup();
+        ClosePopup(source);
     }
 
-    private void ClosePopup()
+    private void ClosePopup(CalculatorPopup? requested = null)
     {
-        var popup = _popup;
+        var popup = requested ?? _popup;
         if (popup is null) return;
-        popup.Close();
-        if (!popup.IsDisposed) popup.Dispose();
+        popup.CloseImmediately();
         if (ReferenceEquals(_popup, popup)) _popup = null;
+    }
+
+    private void EnsureSinglePopup()
+    {
+        var previous = _popup;
+        _popup = CalculatorPopup.KeepSingleOpen(_popup);
+        if (previous is not null && !ReferenceEquals(previous, _popup))
+            AddDiagnostic("Wykryto i usunięto nadmiarowy albo nieaktualny popup.");
+    }
+
+    private void ResetPopups()
+    {
+        var count = CalculatorPopup.CloseAllOpenPopups();
+        _popup = null;
+        AddDiagnostic($"Reset popupów: zamknięto {count} okien.");
     }
 
     private void ShowDiagnostics()
@@ -275,7 +300,8 @@ internal sealed class QuickCalcContext : ApplicationContext
 
     protected override void ExitThreadCore()
     {
-        _popup?.Close(); _diagnostics?.Close(); _hotkeys.Dispose(); _tray.Visible = false; _tray.Dispose(); base.ExitThreadCore();
+        _popupGuard.Stop(); _popupGuard.Dispose(); ResetPopups(); _diagnostics?.Close(); _hotkeys.Dispose();
+        _tray.Visible = false; _tray.Dispose(); base.ExitThreadCore();
     }
 }
 
