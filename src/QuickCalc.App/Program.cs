@@ -16,6 +16,8 @@ static class Program
                 if (new ExpressionEvaluator().Evaluate("+3", "23").Text != "26") return 3;
                 if (new ExpressionEvaluator().Evaluate("r81").Text != "9") return 4;
                 if (new ExpressionEvaluator().Evaluate("*1", "5ft", true).Text != "1.524m") return 5;
+                if (new ExpressionEvaluator().Evaluate("!", "0b11110000").Text != "0b00001111") return 6;
+                if (new ExpressionEvaluator().Evaluate("u2()", "0b1000").Text != "-8") return 7;
                 return 0;
             }
             catch (Exception ex)

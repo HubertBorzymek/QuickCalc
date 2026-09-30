@@ -12,9 +12,9 @@ public enum Dimension
 
 public enum NumericFormat { Decimal, Hexadecimal, Binary }
 
-public readonly record struct Quantity(double BaseValue, Dimension Dimension)
+public readonly record struct Quantity(double BaseValue, Dimension Dimension, int? BitWidth = null)
 {
-    public static Quantity Scalar(double value) => new(value, Dimension.Scalar);
+    public static Quantity Scalar(double value, int? bitWidth = null) => new(value, Dimension.Scalar, bitWidth);
     public static Quantity Of(double baseValue, Dimension dimension) => new(baseValue, dimension);
 }
 
@@ -64,7 +64,8 @@ public sealed record ParsedSelection(Quantity Value, string? Unit, bool SpaceBef
         try
         {
             var magnitude = Convert.ToInt64(digits, numberBase);
-            selection = new ParsedSelection(Quantity.Scalar(checked(sign * magnitude)), null, false, format);
+            var bitWidth = numberBase == 2 ? digits.Length : checked(digits.Length * 4);
+            selection = new ParsedSelection(Quantity.Scalar(checked(sign * magnitude), bitWidth), null, false, format);
             return true;
         }
         catch (Exception ex) when (ex is FormatException or OverflowException or ArgumentException)

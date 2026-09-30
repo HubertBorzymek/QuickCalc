@@ -40,25 +40,28 @@ internal sealed class DiagnosticsForm : Form
         editor.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
         editor.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         editor.Controls.Add(new Label { Text = "Tryb", AutoSize = true }, 0, 0);
-        editor.Controls.Add(new Label { Text = "Klawisz", AutoSize = true }, 1, 0);
-        editor.Controls.Add(new Label { Text = "Modyfikatory", AutoSize = true }, 2, 0);
-        var contextKey = new TextBox(); var contextModifiers = new TextBox();
-        var clipboardKey = new TextBox(); var clipboardModifiers = new TextBox();
+        editor.Controls.Add(new Label { Text = "Kliknij i naciśnij kombinację", AutoSize = true }, 1, 0);
+        editor.SetColumnSpan(editor.GetControlFromPosition(1, 0)!, 2);
+        var initial = _settingsProvider();
+        var contextShortcut = new HotkeyCaptureBox(initial.ContextKey, initial.ContextModifiers);
+        var clipboardShortcut = new HotkeyCaptureBox(initial.ClipboardKey, initial.ClipboardModifiers);
         editor.Controls.Add(new Label { Text = "Kalkulator kontekstowy", AutoSize = true }, 0, 1);
-        editor.Controls.Add(contextKey, 1, 1); editor.Controls.Add(contextModifiers, 2, 1);
+        editor.Controls.Add(contextShortcut, 1, 1); editor.SetColumnSpan(contextShortcut, 2);
         editor.Controls.Add(new Label { Text = "Kalkulator schowka", AutoSize = true }, 0, 2);
-        editor.Controls.Add(clipboardKey, 1, 2); editor.Controls.Add(clipboardModifiers, 2, 2);
+        editor.Controls.Add(clipboardShortcut, 1, 2); editor.SetColumnSpan(clipboardShortcut, 2);
         var apply = new Button { Text = "Zastosuj skróty", AutoSize = true };
         editor.Controls.Add(apply, 3, 1); editor.SetRowSpan(apply, 2);
-        var initial = _settingsProvider();
-        contextKey.Text = initial.ContextKey; contextModifiers.Text = initial.ContextModifiers;
-        clipboardKey.Text = initial.ClipboardKey; clipboardModifiers.Text = initial.ClipboardModifiers;
-        contextKey.Width = clipboardKey.Width = 70; contextModifiers.Width = clipboardModifiers.Width = 90;
-        contextKey.AccessibleName = "Klawisz kontekstowy"; clipboardKey.AccessibleName = "Klawisz schowka";
-        contextModifiers.AccessibleName = "Modyfikatory kontekstowe"; clipboardModifiers.AccessibleName = "Modyfikatory schowka";
+        contextShortcut.Width = clipboardShortcut.Width = 280;
+        contextShortcut.AccessibleName = "Skrót kalkulatora kontekstowego";
+        clipboardShortcut.AccessibleName = "Skrót kalkulatora schowka";
+        contextShortcut.ShortcutCaptured += (_, _) => _keyStatus.Text =
+            $"Nowy skrót kontekstowy: {contextShortcut.Text}";
+        clipboardShortcut.ShortcutCaptured += (_, _) => _keyStatus.Text =
+            $"Nowy skrót schowka: {clipboardShortcut.Text}";
         apply.Click += (_, _) =>
         {
-            _keyStatus.Text = _applySettings(new(contextKey.Text, contextModifiers.Text, clipboardKey.Text, clipboardModifiers.Text));
+            _keyStatus.Text = _applySettings(new(contextShortcut.KeyName, contextShortcut.ModifiersName,
+                clipboardShortcut.KeyName, clipboardShortcut.ModifiersName));
             RefreshReport();
         };
 
@@ -85,4 +88,61 @@ internal sealed class DiagnosticsForm : Form
         _report.Text = _reportProvider();
         if (atEnd) { _report.SelectionStart = _report.TextLength; _report.ScrollToCaret(); }
     }
+}
+
+internal sealed class HotkeyCaptureBox : TextBox
+{
+    private const int VkLWin = 0x5B;
+    private const int VkRWin = 0x5C;
+
+    public string KeyName { get; private set; }
+    public string ModifiersName { get; private set; }
+    public event EventHandler? ShortcutCaptured;
+
+    public HotkeyCaptureBox(string keyName, string modifiersName)
+    {
+        KeyName = keyName;
+        ModifiersName = string.IsNullOrWhiteSpace(modifiersName) ? "None" : modifiersName;
+        ReadOnly = true;
+        ShortcutsEnabled = false;
+        Text = DisplayText();
+        TextAlign = HorizontalAlignment.Center;
+    }
+
+    protected override bool IsInputKey(Keys keyData) => true;
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        e.SuppressKeyPress = true;
+        e.Handled = true;
+        if (IsModifierKey(e.KeyCode)) return;
+
+        CaptureShortcut(e.KeyCode, e.Modifiers, IsKeyDown(VkLWin) || IsKeyDown(VkRWin));
+    }
+
+    internal void CaptureShortcut(Keys keyCode, Keys modifiersValue, bool win = false)
+    {
+        if (IsModifierKey(keyCode) || keyCode == Keys.None) return;
+        KeyName = keyCode.ToString();
+        var modifiers = new List<string>(4);
+        if ((modifiersValue & Keys.Control) == Keys.Control) modifiers.Add("Control");
+        if ((modifiersValue & Keys.Shift) == Keys.Shift) modifiers.Add("Shift");
+        if ((modifiersValue & Keys.Alt) == Keys.Alt) modifiers.Add("Alt");
+        if (win) modifiers.Add("Win");
+        ModifiersName = modifiers.Count == 0 ? "None" : string.Join('+', modifiers);
+        Text = DisplayText();
+        SelectAll();
+        ShortcutCaptured?.Invoke(this, EventArgs.Empty);
+    }
+
+    private string DisplayText() => ModifiersName == "None" ? KeyName : $"{ModifiersName}+{KeyName}";
+
+    private static bool IsModifierKey(Keys key) => key is Keys.ControlKey or Keys.LControlKey or Keys.RControlKey
+        or Keys.ShiftKey or Keys.LShiftKey or Keys.RShiftKey or Keys.Menu or Keys.LMenu or Keys.RMenu
+        or Keys.LWin or Keys.RWin;
+
+    private static bool IsKeyDown(int virtualKey) => (GetKeyState(virtualKey) & 0x8000) != 0;
+
+    [DllImport("user32.dll")]
+    private static extern short GetKeyState(int virtualKey);
 }

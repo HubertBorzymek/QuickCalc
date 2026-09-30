@@ -196,7 +196,7 @@ public sealed class ExpressionEvaluatorTests
 
     [TestMethod]
     [DataRow("^0x00", "0xF0", "0xF0")]
-    [DataRow("&0b11", "0b11110000", "0b0")]
+    [DataRow("&0b11", "0b11110000", "0b00000000")]
     [DataRow("|0b11", "0b11110000", "0b11110011")]
     [DataRow("<<2", "0b11", "0b1100")]
     [DataRow("p2", "234", "54756")]
@@ -217,8 +217,10 @@ public sealed class ExpressionEvaluatorTests
         => Assert.AreEqual(expected, _sut.Evaluate(expression, selection).Text);
 
     [TestMethod]
-    [DataRow("!0b11", "-0b100")]
-    [DataRow("!(0b11)", "-0b100")]
+    [DataRow("!0b10", "0b01")]
+    [DataRow("!0b11110000", "0b00001111")]
+    [DataRow("!(0b11)", "0b00")]
+    [DataRow("!0xF0", "0x0F")]
     [DataRow("abs(-5)", "5")]
     public void EvaluatesNotAndAbsoluteValue(string expression, string expected)
         => Assert.AreEqual(expected, _sut.Evaluate(expression).Text);
@@ -228,8 +230,27 @@ public sealed class ExpressionEvaluatorTests
         => Assert.AreEqual("5", _sut.Evaluate("abs", "-5").Text);
 
     [TestMethod]
+    [DataRow("u2(0b1000)", null, "-8")]
+    [DataRow("u2(0b1111)", null, "-1")]
+    [DataRow("u2(0xF)", null, "-1")]
+    [DataRow("u2(0x80)", null, "-128")]
+    [DataRow("u2", "0b1000", "-8")]
+    [DataRow("u2()", "0b1111", "-1")]
+    public void InterpretsBinaryAndHexAsTwosComplement(
+        string expression, string? selection, string expected)
+        => Assert.AreEqual(expected, _sut.Evaluate(expression, selection).Text);
+
+    [TestMethod]
+    public void TwosComplementRejectsDecimalInput()
+        => Assert.ThrowsExactly<CalculationException>(() => _sut.Evaluate("u2(8)"));
+
+    [TestMethod]
     public void TildeIsNotAcceptedAsNotOperator()
         => Assert.ThrowsExactly<CalculationException>(() => _sut.Evaluate("~0b11"));
+
+    [TestMethod]
+    public void NotShortcutUsesSelectedBinaryWidth()
+        => Assert.AreEqual("0b00001111", _sut.Evaluate("!", "0b11110000").Text);
 
     [TestMethod]
     [DataRow("100||100", null, "50")]

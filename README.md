@@ -32,13 +32,13 @@ Domyślne skróty:
 
 Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Opcja **Zamykaj popup po utracie fokusu** automatycznie anuluje i zamyka kalkulator po kliknięciu innego okna, bez odbierania mu fokusu; ustawienie jest zapamiętywane. Nie rejestruje autostartu.
 
-Popup domyślnie otwiera się jako ciemny, półprzezroczysty pasek **Compact** bez systemowego paska tytułu. Pokazuje zaznaczoną wartość, pole wyrażenia i wynik aktualizowany podczas pisania. Ponowne naciśnięcie `F16`, gdy popup jest otwarty, przełącza **Compact ↔ Expanded** bez kasowania wyrażenia ani utraty fokusu. Widok Expanded dodaje tryb pracy, zaznaczenie, rodzaj działania, historię, skróty oraz błąd parsera. Zwykłe błędy są pokazywane wewnątrz popupu, bez MessageBoxów.
+Popup domyślnie otwiera się jako ciemny, półprzezroczysty pasek **Compact** bez systemowego paska tytułu. Pokazuje zaznaczoną wartość, pole wyrażenia i wynik aktualizowany podczas pisania. Ponowne naciśnięcie `F16`, gdy popup jest otwarty, przełącza **Compact ↔ Expanded** bez kasowania wyrażenia ani utraty fokusu. Widok Expanded dodaje tryb pracy, zaznaczenie, wynik, historię, sterowanie oraz krótką ściągę mniej oczywistych operatorów. Zwykłe błędy są pokazywane wewnątrz popupu, bez MessageBoxów.
 
 W trybie kontekstowym popup jest ustawiany lekko pod aktywnym polem tekstowym (lub nad nim, gdy pod spodem brakuje miejsca). Tryb schowka otwiera się przy kursorze myszy. Położenie i rozmiar są przeliczane dla bieżącego monitora i jego DPI, a popup pozostaje w obszarze roboczym. Tryb schowka nie uruchamia analizy zaznaczenia, a zapytanie UI Automation trybu kontekstowego ma twardy limit czasu, więc wadliwy dostawca edytora nie może blokować pojawienia się okna.
 
 ### Diagnostyka skrótów
 
-Kliknij prawym przyciskiem ikonę QuickCalc w zasobniku i wybierz **Diagnostyka…**. Okno pokazuje osobny stan rejestracji obu skrótów, dokładny błąd Win32, numer sesji procesu oraz dziennik komunikatów `WM_HOTKEY`. Pola **Klawisz** i **Modyfikatory** pozwalają zmienić oba skróty bez restartu; przycisk **Zastosuj skróty** zapisuje konfigurację. Modyfikatory wpisuje się jako `None`, `Control`, `Shift`, `Alt`, `Win` lub połączenie, np. `Control+Shift`. Jeśli nowy skrót jest zajęty, poprzednia konfiguracja zostanie przywrócona.
+Kliknij prawym przyciskiem ikonę QuickCalc w zasobniku i wybierz **Diagnostyka…**. Okno pokazuje osobny stan rejestracji obu skrótów, dokładny błąd Win32, numer sesji procesu oraz dziennik komunikatów `WM_HOTKEY`. Aby zmienić skrót, kliknij jego pole i naciśnij żądaną kombinację: dowolny klawisz bazowy z opcjonalnymi `Ctrl`, `Shift`, `Alt` i `Win`. Przycisk **Zastosuj skróty** rejestruje i zapisuje konfigurację. Jeśli kombinacja jest zarezerwowana przez Windows albo zajęta przez inny program, poprzednia konfiguracja zostanie przywrócona.
 
 Przycisk **Otwórz test kalkulatora** uruchamia kalkulator schowka bez skrótu. W oknie można również sprawdzić kod klawisza rzeczywiście wysyłany przez programowalną klawiaturę i skopiować raport.
 
@@ -50,7 +50,7 @@ Obsługiwane są `+`, `-`, `*`, `/`, potęgowanie `p`, nawiasy, znaki jednoargum
 
 Litera `x` oznacza zaznaczoną wartość, dlatego działają pełne wyrażenia, np. `-x`, `1/x`, `xp2` i `(x+5)/2`. Zachowane są skróty względne: `+5`, `-5`, `*2`, `/2`, samo `r`, `ln` i `log`. Bez zaznaczenia użycie `x` albo skrótu względnego powoduje czytelny błąd. Potęgowanie zapisuje się przez `p`, np. `2p8 = 256`; znak `^` oznacza teraz XOR.
 
-Dostępne są operatory całkowitoliczbowe `&`, `|`, `^`, `!`, `<<` i `>>`; `!` jest bitowym NOT i może obejmować całe wyrażenie, np. `!(0b11)`. Nie przyjmują liczb zmiennoprzecinkowych ani wartości z jednostką. Literały dziesiętne, szesnastkowe i binarne można mieszać, np. `10+0x10` i `0b1000+0x10`. Wynik dziedziczy format zaznaczenia, a bez zaznaczenia — pierwszego literału; wynik niecałkowity jest zawsze dziesiętny. Format całego wyniku można wymusić końcowym `h`/`hex`, `b`/`bin` albo `d`/`dec`, ze spacją lub bez. Wpisanie samego `hex`, `bin` albo `dec` konwertuje zaznaczoną liczbę bez zmiany wartości. Pełny literał HEX ma pierwszeństwo, więc `0xABCD` pozostaje liczbą, natomiast `0xABCD d` wymusza DEC.
+Dostępne są operatory całkowitoliczbowe `&`, `|`, `^`, `!`, `<<` i `>>`. Dla BIN/HEX operator `!` odwraca bity w szerokości zapisu i pozostawia wynik dodatni, np. `!0b11110000 = 0b00001111`, `!0xF0 = 0x0F`. Funkcja `u2` interpretuje wzorzec BIN/HEX jako liczbę w kodzie uzupełnień do dwóch i zwraca DEC: `u2(0b1000) = -8`, `u2(0b1111) = -1`; samo `u2` lub `u2()` działa na zaznaczeniu. Operatory bitowe nie przyjmują liczb zmiennoprzecinkowych ani wartości z jednostką. Literały dziesiętne, szesnastkowe i binarne można mieszać, np. `10+0x10` i `0b1000+0x10`. Wynik dziedziczy format zaznaczenia, a bez zaznaczenia — pierwszego literału; wynik niecałkowity jest zawsze dziesiętny. Format całego wyniku można wymusić końcowym `h`/`hex`, `b`/`bin` albo `d`/`dec`, ze spacją lub bez. Wpisanie samego `hex`, `bin` albo `dec` konwertuje zaznaczoną liczbę bez zmiany wartości. Pełny literał HEX ma pierwszeństwo, więc `0xABCD` pozostaje liczbą, natomiast `0xABCD d` wymusza DEC.
 
 Funkcja `abs` zwraca wartość bezwzględną (`abs(-5)`, `abs(x)` lub samo `abs` dla zaznaczenia). Operator `||` oblicza połączenie równoległe: `R1*R2/(R1+R2)`. Działa dla dwóch skalarów lub rezystancji, również skrótowo, np. zaznaczone `100Ω` i `||100` daje `50Ω`.
 
@@ -62,7 +62,7 @@ Przykłady względne: zaznaczone `25mm` i `+5` daje `30mm`; zaznaczone `81` i `r
 
 ## Zmiana skrótów
 
-Edytuj `hotkeys.json` obok pliku wykonywalnego (w źródłach: `src/QuickCalc.App/hotkeys.json`) i uruchom program ponownie. Nazwy klawiszy odpowiadają `System.Windows.Forms.Keys`, a modyfikatory to `Control`, `Alt`, `Shift`, `Win` albo `None`, łączone znakiem `+`.
+Najwygodniej użyć pól przechwytujących kombinację w oknie **Diagnostyka**. Konfiguracja jest zapisywana w `hotkeys.json` obok pliku wykonywalnego; ten sam plik przechowuje wybór zamykania popupu po utracie fokusu, więc oba ustawienia pozostają aktywne po ponownym uruchomieniu.
 
 ## Budowanie, testy i publikacja
 

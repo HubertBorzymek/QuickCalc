@@ -41,8 +41,9 @@ public sealed class ExpressionEvaluator
         var unitSuffix = outputUnit is null ? "" : (spaced ? " " : "") + outputUnit;
         var inheritedFormat = selection?.NumericFormat ?? parser.FirstNumberFormat ?? NumericFormat.Decimal;
         var outputFormat = forcedFormat ?? inheritedFormat;
+        if (parser.ForcesDecimalResult) outputFormat = NumericFormat.Decimal;
         var formatted = value.Dimension == Dimension.Scalar
-            ? FormatScalar(displayValue, outputFormat)
+            ? FormatScalar(displayValue, outputFormat, value.BitWidth)
             : FormatDecimal(displayValue);
         return new CalculationResult(formatted + unitSuffix, value, relative);
     }
@@ -92,6 +93,7 @@ public sealed class ExpressionEvaluator
     {
         if (text.StartsWith("log", StringComparison.OrdinalIgnoreCase) ||
             text.StartsWith("abs", StringComparison.OrdinalIgnoreCase)) return 3;
+        if (text.StartsWith("u2", StringComparison.OrdinalIgnoreCase)) return 2;
         if (text.StartsWith("ln", StringComparison.OrdinalIgnoreCase)) return 2;
         return text[0] is 'r' or '√' ? 1 : 0;
     }
@@ -143,7 +145,7 @@ public sealed class ExpressionEvaluator
         return position > digitStart && position == text.Length;
     }
 
-    private static string FormatScalar(double value, NumericFormat format)
+    private static string FormatScalar(double value, NumericFormat format, int? bitWidth)
     {
         if (format == NumericFormat.Decimal || !TryGetInteger(value, out var integer))
             return FormatDecimal(value);
@@ -152,6 +154,9 @@ public sealed class ExpressionEvaluator
         var digits = format == NumericFormat.Hexadecimal
             ? magnitude.ToString("X", CultureInfo.InvariantCulture)
             : ToBinary(magnitude);
+        if (!negative && bitWidth is > 0)
+            digits = digits.PadLeft(format == NumericFormat.Hexadecimal
+                ? (bitWidth.Value + 3) / 4 : bitWidth.Value, '0');
         return (negative ? "-" : "") + (format == NumericFormat.Hexadecimal ? "0x" : "0b") + digits;
     }
 
@@ -195,6 +200,7 @@ public sealed class ExpressionEvaluator
         public bool FirstUnitHadSpace { get; private set; }
         public NumericFormat? FirstNumberFormat { get; private set; }
         public bool UsesSelection { get; private set; }
+        public bool ForcesDecimalResult { get; private set; }
 
         public Quantity Parse()
         {
@@ -290,7 +296,8 @@ public sealed class ExpressionEvaluator
             SkipWhite();
             if (Take('+')) return ParseUnary();
             if (Take('-')) { var value = ParseUnary(); return value with { BaseValue = -value.BaseValue }; }
-            if (Take('!')) return Quantity.Scalar(~RequireInteger(ParseUnary()));
+            if (Take('!')) return ApplyNot(ParseUnary());
+            if (TakeWord("u2")) return ParseTwosComplement();
             if (TakeWord("abs"))
             {
                 var value = ParseUnary();
@@ -317,6 +324,49 @@ public sealed class ExpressionEvaluator
             return Quantity.Scalar(natural ? Math.Log(value.BaseValue) : Math.Log10(value.BaseValue));
         }
 
+        private Quantity ParseTwosComplement()
+        {
+            SkipWhite();
+            Quantity value;
+            if (Take('('))
+            {
+                SkipWhite();
+                if (Take(')')) value = SelectedValue();
+                else
+                {
+                    value = ParseParallel();
+                    SkipWhite();
+                    if (!Take(')')) throw Error("Brak zamykającego nawiasu funkcji u2");
+                }
+            }
+            else value = ParseUnary();
+
+            if (value.Dimension != Dimension.Scalar || value.BitWidth is null)
+                throw Error("u2 wymaga wartości zapisanej w BIN albo HEX");
+            var integer = RequireInteger(value);
+            var width = value.BitWidth.Value;
+            if (integer < 0 || width is < 1 or > 63)
+                throw Error("u2 wymaga dodatniego wzorca BIN/HEX o szerokości 1–63 bitów");
+            var raw = (ulong)integer;
+            var limit = 1UL << width;
+            if (raw >= limit) throw Error("Wartość nie mieści się w zapisanej szerokości bitowej");
+            var sign = 1UL << (width - 1);
+            var signed = (raw & sign) == 0 ? (long)raw : (long)(raw - limit);
+            ForcesDecimalResult = true;
+            return Quantity.Scalar(signed);
+        }
+
+        private Quantity ApplyNot(Quantity value)
+        {
+            var integer = RequireInteger(value);
+            if (value.BitWidth is not int width) return Quantity.Scalar(~integer);
+            if (integer < 0 || width is < 1 or > 63)
+                throw Error("NOT dla BIN/HEX wymaga dodatniej wartości o szerokości 1–63 bitów");
+            var mask = (1UL << width) - 1;
+            var result = (~(ulong)integer) & mask;
+            return Quantity.Scalar((long)result, width);
+        }
+
         private Quantity ParsePower()
         {
             var value = ParsePrimary();
@@ -332,10 +382,7 @@ public sealed class ExpressionEvaluator
         {
             SkipWhite();
             if (Take('x'))
-            {
-                UsesSelection = true;
-                return relativeSeed ?? throw Error("Symbol x wymaga zaznaczonej wartości liczbowej");
-            }
+                return SelectedValue();
             if (TakeWord("pi") || Take('π')) return Quantity.Scalar(Math.PI);
             if (TakeWord("e")) return Quantity.Scalar(Math.E);
             if (Take('('))
@@ -408,7 +455,7 @@ public sealed class ExpressionEvaluator
                 throw Error("Liczba całkowita jest poza obsługiwanym zakresem");
             }
             FirstNumberFormat ??= format;
-            return Quantity.Scalar(number);
+            return Quantity.Scalar(number, checked(digits.Length * (numberBase == 2 ? 1 : 4)));
         }
 
         private bool IsPowerOperatorAt(int position)
@@ -463,13 +510,15 @@ public sealed class ExpressionEvaluator
         {
             var leftInteger = RequireInteger(left);
             var rightInteger = RequireInteger(right);
-            return Quantity.Scalar(op switch
+            var result = op switch
             {
                 '&' => leftInteger & rightInteger,
                 '^' => leftInteger ^ rightInteger,
                 '|' => leftInteger | rightInteger,
                 _ => throw Error("Nieobsługiwany operator bitowy")
-            });
+            };
+            var width = Math.Max(left.BitWidth ?? 0, right.BitWidth ?? 0);
+            return Quantity.Scalar(result, width == 0 ? null : width);
         }
 
         private Quantity ApplyParallel(Quantity left, Quantity right)
@@ -499,7 +548,13 @@ public sealed class ExpressionEvaluator
             var integer = RequireInteger(value);
             var count = RequireInteger(countValue);
             if (count is < 0 or > 63) throw Error("Liczba przesunięć musi mieścić się w zakresie 0–63");
-            return Quantity.Scalar(left ? integer << (int)count : integer >> (int)count);
+            return Quantity.Scalar(left ? integer << (int)count : integer >> (int)count, value.BitWidth);
+        }
+
+        private Quantity SelectedValue()
+        {
+            UsesSelection = true;
+            return relativeSeed ?? throw Error("Symbol x wymaga zaznaczonej wartości liczbowej");
         }
 
         private long RequireInteger(Quantity value)

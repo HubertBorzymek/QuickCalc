@@ -15,8 +15,8 @@ internal sealed class CalculatorPopup : Form
     private const int CompactWidth = 400;
     private const int CompactHeight = 60;
     private const int CompactErrorHeight = 88;
-    private const int ExpandedHeight = 160;
-    private const int ExpandedErrorHeight = 187;
+    private const int ExpandedHeight = 202;
+    private const int ExpandedErrorHeight = 228;
     private const int CornerRadius = 14;
     private const int CsDropShadow = 0x00020000;
     private const int DwmWindowCornerPreference = 33;
@@ -39,6 +39,7 @@ internal sealed class CalculatorPopup : Form
     private readonly Label _preview = new();
     private readonly Label _modeDetails = new();
     private readonly Label _resultDetails = new();
+    private readonly Label _operatorsDetails = new();
     private readonly Label _historyDetails = new();
     private readonly Label _controlsHint = new();
     private readonly Label _error = new();
@@ -98,11 +99,12 @@ internal sealed class CalculatorPopup : Form
 
         ConfigureDetailLabel(_modeDetails, Secondary, 9F, FontStyle.Bold);
         ConfigureDetailLabel(_resultDetails, Secondary, 9F, FontStyle.Regular);
+        ConfigureDetailLabel(_operatorsDetails, Secondary, 8.5F, FontStyle.Regular);
         ConfigureDetailLabel(_historyDetails, Muted, 8.5F, FontStyle.Regular);
         ConfigureDetailLabel(_controlsHint, Muted, 8.5F, FontStyle.Regular);
         ConfigureDetailLabel(_error, Error, 8.75F, FontStyle.Regular);
 
-        Controls.AddRange([_selection, _expression, _preview, _modeDetails, _resultDetails,
+        Controls.AddRange([_selection, _expression, _preview, _modeDetails, _resultDetails, _operatorsDetails,
             _historyDetails, _controlsHint, _error]);
 
         _expression.TextChanged += (_, _) =>
@@ -342,6 +344,8 @@ internal sealed class CalculatorPopup : Form
         _historyDetails.Text = _history.Items.Count == 0
             ? "Historia: brak"
             : "Ostatnie: " + Shorten(_history.Items[^1], 40);
+        _operatorsDetails.Text = "x zaznaczenie  •  p potęga  •  ! NOT  •  & | ^ << >>\n" +
+                                 "hex/bin/dec  •  u2  •  abs  •  || równolegle  •  r/ln/log";
         _controlsHint.Text = "Enter — zastosuj   Shift+Enter — SI   Esc — anuluj   F16 — widok";
     }
 
@@ -367,6 +371,7 @@ internal sealed class CalculatorPopup : Form
 
         _modeDetails.Visible = _expanded;
         _resultDetails.Visible = _expanded;
+        _operatorsDetails.Visible = _expanded;
         _historyDetails.Visible = _expanded;
         _controlsHint.Visible = _expanded;
         if (_expanded)
@@ -375,9 +380,10 @@ internal sealed class CalculatorPopup : Form
             var detailWidth = ClientSize.Width - ScalePx(30);
             _modeDetails.SetBounds(detailLeft, ScalePx(66), detailWidth, ScalePx(18));
             _resultDetails.SetBounds(detailLeft, ScalePx(87), detailWidth, ScalePx(18));
-            _historyDetails.SetBounds(detailLeft, ScalePx(108), detailWidth, ScalePx(17));
-            _controlsHint.SetBounds(detailLeft, ScalePx(130), detailWidth, ScalePx(18));
-            _error.SetBounds(detailLeft, ScalePx(157), detailWidth, ScalePx(18));
+            _operatorsDetails.SetBounds(detailLeft, ScalePx(108), detailWidth, ScalePx(36));
+            _historyDetails.SetBounds(detailLeft, ScalePx(148), detailWidth, ScalePx(17));
+            _controlsHint.SetBounds(detailLeft, ScalePx(171), detailWidth, ScalePx(18));
+            _error.SetBounds(detailLeft, ScalePx(202), detailWidth, ScalePx(18));
         }
         else
         {

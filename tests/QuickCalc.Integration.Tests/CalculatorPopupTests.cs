@@ -1,6 +1,7 @@
 using QuickCalc.App;
 using QuickCalc.Core;
 using QuickCalc.Windows;
+using System.Text.Json;
 using System.Windows.Forms;
 
 namespace QuickCalc.Integration.Tests;
@@ -9,6 +10,37 @@ namespace QuickCalc.Integration.Tests;
 [DoNotParallelize]
 public sealed class CalculatorPopupTests
 {
+    [STATestMethod]
+    public void HotkeyCaptureAcceptsArbitraryKeyAndModifierCombination()
+    {
+        using var capture = new HotkeyCaptureBox("F16", "None");
+
+        capture.CaptureShortcut(Keys.K, Keys.Control | Keys.Shift, win: true);
+
+        Assert.AreEqual("K", capture.KeyName);
+        Assert.AreEqual("Control+Shift+Win", capture.ModifiersName);
+        Assert.AreEqual("Control+Shift+Win+K", capture.Text);
+    }
+
+    [TestMethod]
+    public void FocusLossPreferenceIsPersistedWithHotkeys()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"quickcalc-settings-{Guid.NewGuid():N}.json");
+        try
+        {
+            HotkeySettings.FromValues(new("F16", "None", "F15", "Control+Shift"), path,
+                closePopupOnFocusLoss: true).Save();
+
+            using var json = JsonDocument.Parse(File.ReadAllText(path));
+            Assert.IsTrue(json.RootElement.GetProperty("ClosePopupOnFocusLoss").GetBoolean());
+            Assert.AreEqual("F15", json.RootElement.GetProperty("ClipboardKey").GetString());
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
     [TestMethod]
     public void PopupCanBeShownAndDisplaysLiveResult()
     {
@@ -220,6 +252,8 @@ public sealed class CalculatorPopupTests
                 Assert.AreEqual("+10", input.Text);
                 Assert.IsTrue(input.Focused);
                 Assert.IsTrue(popup.Controls.OfType<Label>().Any(label => label.Text.Contains("Shift+Enter — SI")));
+                Assert.IsTrue(popup.Controls.OfType<Label>().Any(label =>
+                    label.Visible && label.Text.Contains("u2") && label.Text.Contains("|| równolegle")));
 
                 popup.ToggleExpanded(); Application.DoEvents();
                 Assert.IsFalse(popup.IsExpanded);
