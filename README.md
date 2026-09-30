@@ -46,15 +46,17 @@ Menu ikony zawiera również osobne polecenia otwierające oba tryby bez użycia
 
 ## Wyrażenia i jednostki
 
-Obsługiwane są `+`, `-`, `*`, `/`, potęgowanie `^`, nawiasy, znaki jednoargumentowe, kropka i przecinek dziesiętny. Pierwiastek kwadratowy zapisuje się krótko jako `r`, np. `r81` albo `r(9+7)`; akceptowany jest również znak `√`. Logarytm naturalny zapisuje się jako `ln`, a dziesiętny jako `log`, np. `ln(e)`, `ln e`, `log1000` albo `log(100)`. Dostępne są stałe `e`, `pi` i `π`, więc działa też np. `2*pi`. Inne stopnie pierwiastka i inne podstawy logarytmu nie mają osobnej krótkiej składni.
+Obsługiwane są `+`, `-`, `*`, `/`, potęgowanie `p`, nawiasy, znaki jednoargumentowe, kropka i przecinek dziesiętny. Pierwiastek kwadratowy zapisuje się jako `r`, np. `r81`, `rx` albo `r(9+7)`; akceptowany jest również znak `√`. Logarytm naturalny zapisuje się jako `ln`, a dziesiętny jako `log`, np. `lnx`, `ln(e)`, `log1000` albo `log(100)`. Dostępne są stałe `e`, `pi` i `π`.
 
-Dla zaznaczonej liczby `^2` podnosi ją do kwadratu, samo `r` ją pierwiastkuje, samo `ln` oblicza logarytm naturalny, a samo `log` — dziesiętny. Dalsze działania można dopisać normalnie: zaznaczone `81` i `r*2+1` daje `19`, a zaznaczone `100` i `log*3` daje `6`. Podanie argumentu po nazwie funkcji tworzy zwykłe wyrażenie niezależne od zaznaczenia, np. `ln e` lub `log 1000`.
+Litera `x` oznacza zaznaczoną wartość, dlatego działają pełne wyrażenia, np. `-x`, `1/x`, `xp2` i `(x+5)/2`. Zachowane są skróty względne: `+5`, `-5`, `*2`, `/2`, samo `r`, `ln` i `log`. Bez zaznaczenia użycie `x` albo skrótu względnego powoduje czytelny błąd. Potęgowanie zapisuje się przez `p`, np. `2p8 = 256`; znak `^` oznacza teraz XOR.
 
-Parser obsługuje jednostki bazowe SI i ich przedrostki (m.in. `m`, `kg`, `s`, `A`, `K`, `mol`, `cd`) oraz jednostki używane w elektronice i technice: `V`, `Ω`/`ohm`, `F`, `H`, `Hz`, `W`, `N`, `Pa`, `J`, `C`, `S`, `Wb`, `T`. Dostępne są również `in`/`inch`, `ft`, `yd`, `mi`, `mil`, `min` i `h`. Przedrostek `u` jest przyjmowany jako łatwy do wpisania odpowiednik `µ`.
+Dostępne są operatory całkowitoliczbowe `&`, `|`, `^`, `~`, `<<` i `>>`. Nie przyjmują liczb zmiennoprzecinkowych ani wartości z jednostką. Literały dziesiętne, szesnastkowe i binarne można mieszać, np. `10+0x10` i `0b1000+0x10`. Wynik dziedziczy format zaznaczenia, a bez zaznaczenia — pierwszego literału; wynik niecałkowity jest zawsze dziesiętny. Format całego wyniku można wymusić końcowym `h`/`hex`, `b`/`bin` albo `d`/`dec`, ze spacją lub bez. Pełny literał HEX ma pierwszeństwo, więc `0xABCD` pozostaje liczbą, natomiast `0xABCD d` wymusza DEC.
 
-Spacja przed jednostką jest zachowywana: `10mm/2` daje `5mm`, natomiast `10 mm/2` daje `5 mm`. `Enter` zachowuje jednostkę wejściową, a `Shift+Enter` dobiera czytelną jednostkę SI, np. zaznaczone `2cm` i `/500` daje `0.04mm`, zaś `5ft` i `*1` daje `1.524m`.
+Parser obsługuje jednostki bazowe SI i ich przedrostki (m.in. `m`, `kg`, `s`, `A`, `K`, `mol`, `cd`) oraz jednostki używane w elektronice i technice: `V`, `Ω`/`ohm`, `F`, `H`, `Hz`, `W`, `N`, `Pa`, `J`, `C`, `S`, `Wb`, `T`. Dostępne są również `in`/`inch`, `ft`, `yd`, `mi`, `mil`, `min` i `hr`/`hour`/`hours`. Przedrostek `u` jest przyjmowany jako łatwy do wpisania odpowiednik `µ`. Samo `h` jest zarezerwowane jako suffix wyniku HEX.
 
-Wyrażenie zaczynające się od operatora jest względne względem prawidłowo zaznaczonej liczby; dotyczy to również `^`. Samo `r`/`√`, `ln` lub `log` oraz funkcja z następującym działaniem również używa zaznaczenia. Wyjątkiem jest `-5` bez zaznaczenia, które oznacza liczbę ujemną. Przykłady: zaznaczone `25mm` i `+5` daje `30mm`; `1in+5mm` daje wynik w calach. Potęgowanie, pierwiastkowanie i logarytmy wielkości z jednostkami pozostają odrzucane, ponieważ nie są działaniami na obsługiwanej wartości skalarnej.
+Spacja przed jednostką jest zachowywana: `10mm/2` daje `5mm`, natomiast `10 mm/2` daje `5 mm`. `Enter` zachowuje jednostkę wejściową, a `Shift+Enter` dobiera czytelną jednostkę SI. Przy pustym polu `Shift+Enter` konwertuje samo zaznaczenie, np. `0.0000047 F` na `4.7 µF`; bez zaznaczenia niczego nie zmienia. Odwrotność częstotliwości lub czasu zmienia wymiar, dlatego `2.5 kHz`, `1/x` i `Shift+Enter` daje `400 µs`.
+
+Przykłady względne: zaznaczone `25mm` i `+5` daje `30mm`; zaznaczone `81` i `r*2+1` daje `19`; zaznaczone `100` i `log*3` daje `6`. Potęgowanie, pierwiastkowanie i logarytmy wielkości z jednostkami pozostają odrzucane, z wyjątkiem obsługiwanej odwrotności czasu i częstotliwości.
 
 ## Zmiana skrótów
 

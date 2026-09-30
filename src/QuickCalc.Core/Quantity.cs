@@ -10,13 +10,16 @@ public enum Dimension
     ElectricCharge, Conductance, MagneticFlux, MagneticFluxDensity
 }
 
+public enum NumericFormat { Decimal, Hexadecimal, Binary }
+
 public readonly record struct Quantity(double BaseValue, Dimension Dimension)
 {
     public static Quantity Scalar(double value) => new(value, Dimension.Scalar);
     public static Quantity Of(double baseValue, Dimension dimension) => new(baseValue, dimension);
 }
 
-public sealed record ParsedSelection(Quantity Value, string? Unit, bool SpaceBeforeUnit)
+public sealed record ParsedSelection(Quantity Value, string? Unit, bool SpaceBeforeUnit,
+    NumericFormat NumericFormat = NumericFormat.Decimal)
 {
     private static readonly Regex Pattern = new(
         @"^\s*([+-]?(?:\d+(?:[\.,]\d*)?|[\.,]\d+))([ \t]*)([\p{L}µμΩ]+)?\s*$",
@@ -26,6 +29,9 @@ public sealed record ParsedSelection(Quantity Value, string? Unit, bool SpaceBef
     {
         selection = null;
         if (string.IsNullOrWhiteSpace(text)) return false;
+        var trimmed = text.Trim();
+        if (TryParseBasedInteger(trimmed, "0x", 16, NumericFormat.Hexadecimal, out selection) ||
+            TryParseBasedInteger(trimmed, "0b", 2, NumericFormat.Binary, out selection)) return true;
         var match = Pattern.Match(text);
         if (!match.Success || !double.TryParse(match.Groups[1].Value.Replace(',', '.'), NumberStyles.Float,
                 CultureInfo.InvariantCulture, out var number) || !double.IsFinite(number)) return false;
@@ -43,6 +49,28 @@ public sealed record ParsedSelection(Quantity Value, string? Unit, bool SpaceBef
             return true;
         }
         catch (CalculationException) { return false; }
+    }
+
+    private static bool TryParseBasedInteger(string text, string prefix, int numberBase,
+        NumericFormat format, out ParsedSelection? selection)
+    {
+        selection = null;
+        var sign = 1L;
+        if (text.StartsWith('+')) text = text[1..];
+        else if (text.StartsWith('-')) { sign = -1; text = text[1..]; }
+        if (!text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return false;
+        var digits = text[prefix.Length..];
+        if (digits.Length == 0) return false;
+        try
+        {
+            var magnitude = Convert.ToInt64(digits, numberBase);
+            selection = new ParsedSelection(Quantity.Scalar(checked(sign * magnitude)), null, false, format);
+            return true;
+        }
+        catch (Exception ex) when (ex is FormatException or OverflowException or ArgumentException)
+        {
+            return false;
+        }
     }
 }
 
@@ -72,7 +100,7 @@ internal static class Units
     private static readonly Dictionary<string, string> Aliases = new(StringComparer.OrdinalIgnoreCase)
     {
         ["inch"] = "in", ["inches"] = "in", ["foot"] = "ft", ["feet"] = "ft",
-        ["ohm"] = "Ω", ["ohms"] = "Ω"
+        ["ohm"] = "Ω", ["ohms"] = "Ω", ["hr"] = "h", ["hour"] = "h", ["hours"] = "h"
     };
 
     private static readonly (string Symbol, double Factor)[] Prefixes =

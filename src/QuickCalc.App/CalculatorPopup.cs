@@ -244,9 +244,16 @@ internal sealed class CalculatorPopup : Form
     {
         try
         {
-            var result = _evaluator.Evaluate(_expression.Text,
+            var expression = _expression.Text;
+            if (convertToSi && string.IsNullOrWhiteSpace(expression))
+            {
+                if (_mode != CalculatorMode.Context ||
+                    !ParsedSelection.TryParse(_target.SelectedText, out var selected) || selected?.Unit is null) return;
+                expression = "*1";
+            }
+            var result = _evaluator.Evaluate(expression,
                 _mode == CalculatorMode.Context ? _target.SelectedText : null, convertToSi);
-            _history.Add(_expression.Text);
+            if (!string.IsNullOrWhiteSpace(_expression.Text)) _history.Add(_expression.Text);
             Finish(new(_mode, false, result.Text));
         }
         catch (CalculationException ex)

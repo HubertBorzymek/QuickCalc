@@ -82,6 +82,35 @@ public sealed class CalculatorPopupTests
     }
 
     [STATestMethod]
+    public void EmptyShiftEnterConvertsSelectedUnitToReadableSi()
+    {
+        using var popup = new CalculatorPopup(CalculatorMode.Context,
+            new TargetContext((IntPtr)1, (IntPtr)1, null, null, "0.0000047 F", "test"),
+            new ExpressionEvaluator(), new ExpressionHistory());
+        PopupOperation? completed = null;
+        popup.OperationFinished += (_, operation) => completed = operation;
+
+        popup.Submit(convertToSi: true);
+
+        Assert.IsNotNull(completed);
+        Assert.AreEqual("4.7 µF", completed.Result);
+    }
+
+    [STATestMethod]
+    public void EmptyShiftEnterWithoutSelectionDoesNothing()
+    {
+        using var popup = new CalculatorPopup(CalculatorMode.Clipboard,
+            new TargetContext(IntPtr.Zero, IntPtr.Zero, null, null, null, "test"),
+            new ExpressionEvaluator(), new ExpressionHistory());
+        PopupOperation? completed = null;
+        popup.OperationFinished += (_, operation) => completed = operation;
+
+        popup.Submit(convertToSi: true);
+
+        Assert.IsNull(completed);
+    }
+
+    [STATestMethod]
     public void EscapeCancelsWithoutReturningAResult()
     {
         using var popup = new CalculatorPopup(CalculatorMode.Context,

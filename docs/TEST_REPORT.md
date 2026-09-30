@@ -18,9 +18,9 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
-- `QuickCalc.Core.Tests`: 83 zaliczone, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 27 zaliczonych, 0 niezaliczonych, 1 pominięty;
-- łącznie: 111 przypadków, z czego 110 zaliczonych i 1 pominięty.
+- `QuickCalc.Core.Tests`: 145 zaliczonych, 0 niezaliczonych, 0 pominiętych;
+- `QuickCalc.Integration.Tests`: 29 zaliczonych, 0 niezaliczonych, 1 pominięty;
+- łącznie: 175 przypadków, z czego 174 zaliczone i 1 pominięty.
 
 Testy klawiaturowego `Ctrl+C` i awaryjnego `Ctrl+V` wymagają wyłącznego prawa do okna pierwszoplanowego. W ostatnim pełnym przebiegu runner nie przyznał go testowi kopiowania, dlatego został oznaczony jako pominięty zamiast fałszywie pozytywnego. Test wklejenia i ponownego zaznaczenia przeszedł; oba przepływy mają także niezależne testy polityki i schowka.
 
@@ -32,7 +32,7 @@ Końcowy test przeglądarkowy wykrył właściwą przyczynę wcześniejszych odm
 
 Po kolejnym raporcie usunięto błędny warunek wymagający, aby dostawca UI Automation po utracie i odzyskaniu fokusu zwrócił identyczny tekst zaznaczenia. Zaznaczenie niestandardowych edytorów jest teraz dodatkowo wykrywane przez tymczasowe `Ctrl+C`, a wynik trafia do nich przez standardowe `Ctrl+V` z odtworzeniem wcześniejszego schowka. Test integracyjny wykrył i naprawił wyścig, w którym stary schowek mógł zostać przywrócony przed obsłużeniem `Ctrl+V`.
 
-Dodane regresje sprawdzają pełne zaznaczenie dłuższego wyniku, pozycję kursora po wstawieniu bez zaznaczenia, zachowanie odstępu przed jednostką, przedrostki SI i jednostki elektroniczne, potęgowanie, pierwiastek `r` oraz zatwierdzenie z konwersją SI przez `Shift+Enter` (`2cm / 500 → 0.04mm`, `5ft → 1.524m`). Parser sprawdza też `ln` o podstawie `e`, `log` o podstawie 10, stałe `e`, `pi`/`π`, krótką składnię bez nawiasów i warianty względne na zaznaczonej liczbie. Wartości niedodatnie i argumenty z jednostką są dla logarytmów odrzucane.
+Dodane regresje sprawdzają pełne zaznaczenie dłuższego wyniku, pozycję kursora po wstawieniu bez zaznaczenia, zachowanie odstępu przed jednostką, przedrostki SI i jednostki elektroniczne, potęgowanie `p`, pierwiastek `r` oraz zatwierdzenie z konwersją SI przez `Shift+Enter`. Parser sprawdza też zmienną zaznaczenia `x`, skróty względne, XOR `^`, wszystkie operatory bitowe, mieszanie DEC/HEX/BIN, dziedziczenie i wymuszanie formatu wyniku oraz niejednoznaczne zakończenia literałów HEX. Osobne testy obejmują pusty `Shift+Enter` z jednostką i odwrotność częstotliwości `2.5 kHz → 400 µs`.
 
 Przebudowany popup jest objęty testami rzeczywistego formularza WinForms: borderless Compact, live preview, inline error ze zmianą wysokości, przełączanie Compact/Expanded z zachowaniem tekstu i fokusu, Enter, Shift+Enter dla jednostki oraz skalara, Escape, pozycja pod polem kontekstowym i pozycja przy kursorze w granicach monitora. Oba warianty zostały dodatkowo wyrenderowane i sprawdzone wizualnie. Aplikacja używa trybu DPI `PerMonitorV2`, a zmianę DPI obsługuje ponownym przeliczeniem układu i położenia.
 
@@ -42,7 +42,7 @@ Po regresjach w VS Code i pasku adresu Opery usunięto ponowne używanie zapami�
 
 Po wykryciu blokującego polecenia kopiowania w Visual Studio tryb bez zaznaczenia nie uruchamia już awaryjnego `Ctrl+C`. Próba schowka jest dopuszczona wyłącznie wtedy, gdy UI Automation jednoznacznie zgłosi niezerową długość zakresu, lecz nie zwróci jego treści. Regresja tej decyzji jest objęta osobnym testem.
 
-Po testach aplikacji GPT i pól Altium wyszukiwanie wzorca tekstowego objęło także nadrzędne kontenery aktywnego elementu. Kontrolki realizujące protokół komunikatów Win32 Edit są wykrywane również przy niestandardowej nazwie klasy, z limitami czasu chroniącymi przed zawieszonym oknem. Zaznaczone `-18.3mm` i wynik bez jednostki zachowuje `mm`. Dla braku zaznaczenia zapamiętany pusty zakres UI Automation odtwarza pozycję kursora po powrocie fokusu, ale zakres zawierający zaznaczenie nadal nie jest ponownie aktywowany ze względu na błąd Opery. Parser względny obsługuje teraz `^2`, samo `r`/`√` oraz dalsze działania, np. `81` z `r*2+1` daje `19`.
+Po testach aplikacji GPT i pól Altium wyszukiwanie wzorca tekstowego objęło także nadrzędne kontenery aktywnego elementu. Kontrolki realizujące protokół komunikatów Win32 Edit są wykrywane również przy niestandardowej nazwie klasy, z limitami czasu chroniącymi przed zawieszonym oknem. Zaznaczone `-18.3mm` i wynik bez jednostki zachowuje `mm`. Dla braku zaznaczenia zapamiętany pusty zakres UI Automation odtwarza pozycję kursora po powrocie fokusu, ale zakres zawierający zaznaczenie nadal nie jest ponownie aktywowany ze względu na błąd Opery. Parser względny obsługuje zmienną `x`, samo `r`/`√` oraz dalsze działania, np. `81` z `r*2+1` daje `19`.
 
 Ponieważ część pól Altium nie udostępnia zakresu ani przez `EM_GETSEL`, ani UI Automation, dodano bezpośredni `WM_COPY` do aktywnej kontrolki. W przeciwieństwie do klawiaturowego `Ctrl+C` nie uruchamia on polecenia edytora Visual Studio. Schowek jest oznaczany wartością kontrolną i odtwarzany; wynik jest przyjmowany tylko wtedy, gdy kontrolka faktycznie skopiuje poprawną liczbę z opcjonalną jednostką. Test integracyjny potwierdza odczyt zaznaczonego `25mm` oraz brak fałszywego wyniku przy samym kursorze.
 

@@ -10,14 +10,14 @@ public sealed class ExpressionEvaluator
     {
         if (string.IsNullOrWhiteSpace(expression)) throw new CalculationException("Wpisz wyrażenie.");
         ParsedSelection.TryParse(selectedText, out var selection);
-        var trimmed = expression.Trim();
-        var relative = IsRelative(trimmed, selection is not null);
-        if (relative && selection is null)
-            throw new CalculationException("Działanie względne wymaga zaznaczonej wartości liczbowej.");
+        var parserText = expression.Trim();
+        var forcedFormat = ExtractResultFormat(ref parserText);
+        if (parserText.Length == 0) throw new CalculationException("Wpisz wyrażenie przed suffixem formatu.");
+        parserText = ExpandRelativeShortcut(parserText);
 
-        var parserText = relative ? ExpandRelativeExpression(trimmed) : trimmed;
-        var parser = new Parser(parserText, relative, selection, selection?.Value);
+        var parser = new Parser(parserText, selection, selection?.Value);
         var value = parser.Parse();
+        var relative = parser.UsesSelection;
         if (!relative && value.Dimension == Dimension.Scalar && parser.FirstUnit is null && selection?.Unit is not null)
         {
             var selectedUnit = Units.Resolve(selection.Unit);
@@ -27,38 +27,54 @@ public sealed class ExpressionEvaluator
 
         string? outputUnit = null;
         if (value.Dimension != Dimension.Scalar)
+        {
             outputUnit = convertToSi
                 ? Units.ReadableSiUnit(value.BaseValue, value.Dimension)
-                : selection?.Unit ?? parser.FirstUnit ?? Units.ReadableSiUnit(value.BaseValue, value.Dimension);
-
-        var displayValue = outputUnit is null ? value.BaseValue : value.BaseValue / Units.Resolve(outputUnit).ToBaseFactor;
-        var spaced = selection?.SpaceBeforeUnit ?? parser.FirstUnitHadSpace;
-        var suffix = outputUnit is null ? "" : (spaced ? " " : "") + outputUnit;
-        return new CalculationResult(Format(displayValue) + suffix, value, relative);
-    }
-
-    private static bool IsRelative(string text, bool hasSelection)
-    {
-        if (text.Length == 0) return false;
-        var functionLength = RelativeFunctionLength(text);
-        if (functionLength > 0)
-        {
-            var position = functionLength;
-            while (position < text.Length && char.IsWhiteSpace(text[position])) position++;
-            if (position == text.Length) return true;
-            return hasSelection && text[position] is '+' or '-' or '*' or '/' or '^';
+                : MatchingOutputUnit(selection, parser, value.Dimension) ??
+                  Units.ReadableSiUnit(value.BaseValue, value.Dimension);
         }
-        if (text[0] is not ('+' or '-' or '*' or '/' or '^')) return false;
-        if (text[0] == '-' && !hasSelection) return false;
-        return true;
+
+        var displayValue = outputUnit is null
+            ? value.BaseValue
+            : value.BaseValue / Units.Resolve(outputUnit).ToBaseFactor;
+        var spaced = selection?.SpaceBeforeUnit ?? parser.FirstUnitHadSpace;
+        var unitSuffix = outputUnit is null ? "" : (spaced ? " " : "") + outputUnit;
+        var inheritedFormat = selection?.NumericFormat ?? parser.FirstNumberFormat ?? NumericFormat.Decimal;
+        var outputFormat = forcedFormat ?? inheritedFormat;
+        var formatted = value.Dimension == Dimension.Scalar
+            ? FormatScalar(displayValue, outputFormat)
+            : FormatDecimal(displayValue);
+        return new CalculationResult(formatted + unitSuffix, value, relative);
     }
 
-    private static string ExpandRelativeExpression(string text)
+    private static string? MatchingOutputUnit(ParsedSelection? selection, Parser parser, Dimension dimension)
     {
+        if (selection?.Unit is not null && Units.Resolve(selection.Unit).Dimension == dimension)
+            return selection.Unit;
+        if (parser.FirstUnit is not null && Units.Resolve(parser.FirstUnit).Dimension == dimension)
+            return parser.FirstUnit;
+        return null;
+    }
+
+    private static string ExpandRelativeShortcut(string text)
+    {
+        if (text[0] == '+' && StartsNumericOperand(text, 1)) return "x" + text;
+        if (text[0] is '*' or '/') return "x" + text;
+        if (text[0] == '-' && StartsNumericOperand(text, 1)) return "x" + text;
+
         var functionLength = RelativeFunctionLength(text);
-        return functionLength > 0
-            ? text[..functionLength] + "@" + text[functionLength..]
-            : "@" + text;
+        if (functionLength == 0) return text;
+        var position = functionLength;
+        while (position < text.Length && char.IsWhiteSpace(text[position])) position++;
+        if (position == text.Length || text[position] is '+' or '-' or '*' or '/' or 'p' or '^' or '&' or '|')
+            return text[..functionLength] + "x" + text[functionLength..];
+        return text;
+    }
+
+    private static bool StartsNumericOperand(string text, int position)
+    {
+        while (position < text.Length && char.IsWhiteSpace(text[position])) position++;
+        return position < text.Length && (char.IsDigit(text[position]) || text[position] is '.' or ',');
     }
 
     private static int RelativeFunctionLength(string text)
@@ -68,10 +84,86 @@ public sealed class ExpressionEvaluator
         return text[0] is 'r' or '√' ? 1 : 0;
     }
 
-    private static string Format(double value)
+    private static NumericFormat? ExtractResultFormat(ref string text)
+    {
+        (string Token, NumericFormat Format)[] suffixes =
+        [
+            ("hex", NumericFormat.Hexadecimal), ("bin", NumericFormat.Binary),
+            ("dec", NumericFormat.Decimal), ("h", NumericFormat.Hexadecimal),
+            ("b", NumericFormat.Binary), ("d", NumericFormat.Decimal)
+        ];
+
+        foreach (var (token, format) in suffixes)
+        {
+            if (!text.EndsWith(token, StringComparison.Ordinal)) continue;
+            var start = text.Length - token.Length;
+            if (start <= 0 || !char.IsWhiteSpace(text[start - 1])) continue;
+            text = text[..start].TrimEnd();
+            return format;
+        }
+
+        if (IsCompleteHexLiteral(text)) return null;
+        foreach (var (token, format) in suffixes)
+        {
+            if (!text.EndsWith(token, StringComparison.Ordinal) || text.Length == token.Length) continue;
+            var candidate = text[..^token.Length].TrimEnd();
+            if (candidate.Length == 0) continue;
+            if (token.Length == 1 && char.IsLetter(candidate[^1])) continue;
+            text = candidate;
+            return format;
+        }
+        return null;
+    }
+
+    private static bool IsCompleteHexLiteral(string text)
+    {
+        var position = text.Length > 0 && text[0] is '+' or '-' ? 1 : 0;
+        if (position + 2 >= text.Length || text[position] != '0' ||
+            text[position + 1] is not ('x' or 'X')) return false;
+        position += 2;
+        var digitStart = position;
+        while (position < text.Length && Uri.IsHexDigit(text[position])) position++;
+        return position > digitStart && position == text.Length;
+    }
+
+    private static string FormatScalar(double value, NumericFormat format)
+    {
+        if (format == NumericFormat.Decimal || !TryGetInteger(value, out var integer))
+            return FormatDecimal(value);
+        var negative = integer < 0;
+        var magnitude = negative ? (ulong)(-(integer + 1)) + 1 : (ulong)integer;
+        var digits = format == NumericFormat.Hexadecimal
+            ? magnitude.ToString("X", CultureInfo.InvariantCulture)
+            : ToBinary(magnitude);
+        return (negative ? "-" : "") + (format == NumericFormat.Hexadecimal ? "0x" : "0b") + digits;
+    }
+
+    private static string ToBinary(ulong value)
+    {
+        if (value == 0) return "0";
+        Span<char> buffer = stackalloc char[64];
+        var position = buffer.Length;
+        while (value > 0)
+        {
+            buffer[--position] = (value & 1) == 0 ? '0' : '1';
+            value >>= 1;
+        }
+        return new string(buffer[position..]);
+    }
+
+    private static string FormatDecimal(double value)
     {
         if (Math.Abs(value) < 5e-15) value = 0;
         return value.ToString("0.###############", CultureInfo.InvariantCulture);
+    }
+
+    private static bool TryGetInteger(double value, out long integer)
+    {
+        integer = 0;
+        if (!double.IsFinite(value) || value < long.MinValue || value > long.MaxValue || value != Math.Truncate(value))
+            return false;
+        integer = (long)value;
+        return (double)integer == value;
     }
 
     private static void EnsureFinite(double value)
@@ -79,18 +171,65 @@ public sealed class ExpressionEvaluator
         if (!double.IsFinite(value)) throw new CalculationException("Przepełnienie matematyczne.");
     }
 
-    private sealed class Parser(string text, bool relative, ParsedSelection? selection, Quantity? relativeSeed)
+    private sealed class Parser(string text, ParsedSelection? selection, Quantity? relativeSeed)
     {
         private int _position;
         public string? FirstUnit { get; private set; }
         public bool FirstUnitHadSpace { get; private set; }
+        public NumericFormat? FirstNumberFormat { get; private set; }
+        public bool UsesSelection { get; private set; }
 
         public Quantity Parse()
         {
-            var value = ParseAddSubtract();
+            var value = ParseBitwiseOr();
             SkipWhite();
             if (_position != text.Length) throw Error("Nieobsługiwana składnia");
             return value;
+        }
+
+        private Quantity ParseBitwiseOr()
+        {
+            var value = ParseBitwiseXor();
+            while (true)
+            {
+                SkipWhite();
+                if (!Take('|')) return value;
+                value = ApplyBitwise('|', value, ParseBitwiseXor());
+            }
+        }
+
+        private Quantity ParseBitwiseXor()
+        {
+            var value = ParseBitwiseAnd();
+            while (true)
+            {
+                SkipWhite();
+                if (!Take('^')) return value;
+                value = ApplyBitwise('^', value, ParseBitwiseAnd());
+            }
+        }
+
+        private Quantity ParseBitwiseAnd()
+        {
+            var value = ParseShift();
+            while (true)
+            {
+                SkipWhite();
+                if (!Take('&')) return value;
+                value = ApplyBitwise('&', value, ParseShift());
+            }
+        }
+
+        private Quantity ParseShift()
+        {
+            var value = ParseAddSubtract();
+            while (true)
+            {
+                SkipWhite();
+                if (Take("<<")) value = ApplyShift(left: true, value, ParseAddSubtract());
+                else if (Take(">>")) value = ApplyShift(left: false, value, ParseAddSubtract());
+                else return value;
+            }
         }
 
         private Quantity ParseAddSubtract()
@@ -101,7 +240,7 @@ public sealed class ExpressionEvaluator
                 SkipWhite();
                 if (!Take('+') && !Take('-')) return value;
                 var op = text[_position - 1];
-                value = Apply(op, value, ParseMultiplyDivide());
+                value = ApplyArithmetic(op, value, ParseMultiplyDivide());
             }
         }
 
@@ -113,7 +252,7 @@ public sealed class ExpressionEvaluator
                 SkipWhite();
                 if (!Take('*') && !Take('/')) return value;
                 var op = text[_position - 1];
-                value = Apply(op, value, ParseUnary());
+                value = ApplyArithmetic(op, value, ParseUnary());
             }
         }
 
@@ -121,15 +260,16 @@ public sealed class ExpressionEvaluator
         {
             SkipWhite();
             if (Take('+')) return ParseUnary();
-            if (Take('-')) { var q = ParseUnary(); return q with { BaseValue = -q.BaseValue }; }
+            if (Take('-')) { var value = ParseUnary(); return value with { BaseValue = -value.BaseValue }; }
+            if (Take('~')) return Quantity.Scalar(~RequireInteger(ParseUnary()));
             if (TakeWord("ln")) return ApplyLogarithm(ParseUnary(), natural: true);
             if (TakeWord("log")) return ApplyLogarithm(ParseUnary(), natural: false);
             if (Take('r') || Take('√'))
             {
-                var q = ParseUnary();
-                if (q.Dimension != Dimension.Scalar) throw Error("Pierwiastek z jednostki nie jest obsługiwany");
-                if (q.BaseValue < 0) throw Error("Pierwiastek z liczby ujemnej");
-                return Quantity.Scalar(Math.Sqrt(q.BaseValue));
+                var value = ParseUnary();
+                if (value.Dimension != Dimension.Scalar) throw Error("Pierwiastek z jednostki nie jest obsługiwany");
+                if (value.BaseValue < 0) throw Error("Pierwiastek z liczby ujemnej");
+                return Quantity.Scalar(Math.Sqrt(value.BaseValue));
             }
             return ParsePower();
         }
@@ -147,7 +287,7 @@ public sealed class ExpressionEvaluator
         {
             var value = ParsePrimary();
             SkipWhite();
-            if (!Take('^')) return value;
+            if (!Take('p')) return value;
             var exponent = ParseUnary();
             if (value.Dimension != Dimension.Scalar || exponent.Dimension != Dimension.Scalar)
                 throw Error("Potęgowanie wartości z jednostką nie jest obsługiwane");
@@ -157,16 +297,29 @@ public sealed class ExpressionEvaluator
         private Quantity ParsePrimary()
         {
             SkipWhite();
-            if (Take('@')) return relativeSeed ?? throw Error("Brak zaznaczonej wartości");
+            if (Take('x'))
+            {
+                UsesSelection = true;
+                return relativeSeed ?? throw Error("Symbol x wymaga zaznaczonej wartości liczbowej");
+            }
             if (TakeWord("pi") || Take('π')) return Quantity.Scalar(Math.PI);
             if (TakeWord("e")) return Quantity.Scalar(Math.E);
             if (Take('('))
             {
-                var value = ParseAddSubtract();
+                var value = ParseBitwiseOr();
                 SkipWhite();
                 if (!Take(')')) throw Error("Brak zamykającego nawiasu");
                 return value;
             }
+            return ParseNumber();
+        }
+
+        private Quantity ParseNumber()
+        {
+            if (StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                return ParseBasedInteger(NumericFormat.Hexadecimal, 16, Uri.IsHexDigit);
+            if (StartsWith("0b", StringComparison.OrdinalIgnoreCase))
+                return ParseBasedInteger(NumericFormat.Binary, 2, c => c is '0' or '1');
 
             var start = _position;
             var decimalSeen = false;
@@ -181,10 +334,16 @@ public sealed class ExpressionEvaluator
             var raw = text[start.._position].Replace(',', '.');
             if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) || !double.IsFinite(number))
                 throw Error("Nieprawidłowa liczba");
+            FirstNumberFormat ??= NumericFormat.Decimal;
 
             var whitespaceStart = _position;
             SkipWhite();
             var unitStart = _position;
+            if (IsPowerOperatorAt(unitStart))
+            {
+                _position = whitespaceStart;
+                return Quantity.Scalar(number);
+            }
             while (_position < text.Length && IsUnitCharacter(text[_position])) _position++;
             if (unitStart == _position)
             {
@@ -200,17 +359,49 @@ public sealed class ExpressionEvaluator
             return Quantity.Of(number * unit.ToBaseFactor, unit.Dimension);
         }
 
-        private Quantity Apply(char op, Quantity left, Quantity right)
+        private Quantity ParseBasedInteger(NumericFormat format, int numberBase, Func<char, bool> isDigit)
+        {
+            _position += 2;
+            var start = _position;
+            while (_position < text.Length && isDigit(text[_position])) _position++;
+            if (start == _position) throw Error(format == NumericFormat.Hexadecimal
+                ? "Oczekiwano cyfr HEX" : "Oczekiwano cyfr BIN");
+            var digits = text[start.._position];
+            long number;
+            try { number = Convert.ToInt64(digits, numberBase); }
+            catch (Exception ex) when (ex is FormatException or OverflowException or ArgumentException)
+            {
+                throw Error("Liczba całkowita jest poza obsługiwanym zakresem");
+            }
+            FirstNumberFormat ??= format;
+            return Quantity.Scalar(number);
+        }
+
+        private bool IsPowerOperatorAt(int position)
+        {
+            if (position >= text.Length || text[position] != 'p') return false;
+            position++;
+            while (position < text.Length && char.IsWhiteSpace(text[position])) position++;
+            return position < text.Length && (char.IsDigit(text[position]) ||
+                text[position] is '.' or ',' or 'x' or '(' or '+' or '-' or '~' or 'r' or '√');
+        }
+
+        private Quantity ApplyArithmetic(char op, Quantity left, Quantity right)
         {
             if (op is '+' or '-')
             {
                 if (left.Dimension != right.Dimension)
                 {
-                    if (relative && selection is not null && left.Dimension != Dimension.Scalar && right.Dimension == Dimension.Scalar)
-                        right = Quantity.Of(right.BaseValue * Units.Resolve(selection.Unit!).ToBaseFactor, left.Dimension);
+                    if (UsesSelection && selection?.Unit is not null &&
+                        left.Dimension != Dimension.Scalar && right.Dimension == Dimension.Scalar)
+                        right = Quantity.Of(right.BaseValue * Units.Resolve(selection.Unit).ToBaseFactor, left.Dimension);
+                    else if (UsesSelection && selection?.Unit is not null &&
+                             left.Dimension == Dimension.Scalar && right.Dimension != Dimension.Scalar)
+                        left = Quantity.Of(left.BaseValue * Units.Resolve(selection.Unit).ToBaseFactor, right.Dimension);
                     else throw Error("Nie można dodawać wartości o różnych wymiarach");
                 }
-                return new Quantity(op == '+' ? left.BaseValue + right.BaseValue : left.BaseValue - right.BaseValue, left.Dimension);
+                return new Quantity(op == '+' ? left.BaseValue + right.BaseValue : left.BaseValue - right.BaseValue,
+                    left.Dimension);
             }
             if (op == '*')
             {
@@ -221,27 +412,79 @@ public sealed class ExpressionEvaluator
             }
             if (right.BaseValue == 0) throw Error("Dzielenie przez zero");
             if (left.Dimension == Dimension.Scalar && right.Dimension != Dimension.Scalar)
-                throw Error("Dzielenie liczby przez wartość z jednostką nie jest obsługiwane");
+            {
+                var reciprocalDimension = right.Dimension switch
+                {
+                    Dimension.Frequency => Dimension.Time,
+                    Dimension.Time => Dimension.Frequency,
+                    _ => throw Error("Dzielenie liczby przez wartość z tą jednostką nie jest obsługiwane")
+                };
+                return Quantity.Of(left.BaseValue / right.BaseValue, reciprocalDimension);
+            }
             return new Quantity(left.BaseValue / right.BaseValue,
                 left.Dimension == right.Dimension ? Dimension.Scalar : left.Dimension);
         }
 
+        private Quantity ApplyBitwise(char op, Quantity left, Quantity right)
+        {
+            var leftInteger = RequireInteger(left);
+            var rightInteger = RequireInteger(right);
+            return Quantity.Scalar(op switch
+            {
+                '&' => leftInteger & rightInteger,
+                '^' => leftInteger ^ rightInteger,
+                '|' => leftInteger | rightInteger,
+                _ => throw Error("Nieobsługiwany operator bitowy")
+            });
+        }
+
+        private Quantity ApplyShift(bool left, Quantity value, Quantity countValue)
+        {
+            var integer = RequireInteger(value);
+            var count = RequireInteger(countValue);
+            if (count is < 0 or > 63) throw Error("Liczba przesunięć musi mieścić się w zakresie 0–63");
+            return Quantity.Scalar(left ? integer << (int)count : integer >> (int)count);
+        }
+
+        private long RequireInteger(Quantity value)
+        {
+            if (value.Dimension != Dimension.Scalar || !TryGetInteger(value.BaseValue, out var integer))
+                throw Error("Operator bitowy wymaga integera bez jednostki");
+            return integer;
+        }
+
         private static bool IsUnitCharacter(char c) => char.IsLetter(c) || c is 'µ' or 'μ' or 'Ω';
+
         private bool Take(char expected)
         {
             if (_position >= text.Length || text[_position] != expected) return false;
             _position++;
             return true;
         }
-        private bool TakeWord(string expected)
+
+        private bool Take(string expected)
         {
-            if (_position + expected.Length > text.Length ||
-                !text.AsSpan(_position, expected.Length).Equals(expected.AsSpan(), StringComparison.OrdinalIgnoreCase))
-                return false;
+            if (!StartsWith(expected, StringComparison.Ordinal)) return false;
             _position += expected.Length;
             return true;
         }
-        private void SkipWhite() { while (_position < text.Length && char.IsWhiteSpace(text[_position])) _position++; }
+
+        private bool TakeWord(string expected)
+        {
+            if (!StartsWith(expected, StringComparison.OrdinalIgnoreCase)) return false;
+            _position += expected.Length;
+            return true;
+        }
+
+        private bool StartsWith(string expected, StringComparison comparison) =>
+            _position + expected.Length <= text.Length &&
+            text.AsSpan(_position, expected.Length).Equals(expected.AsSpan(), comparison);
+
+        private void SkipWhite()
+        {
+            while (_position < text.Length && char.IsWhiteSpace(text[_position])) _position++;
+        }
+
         private CalculationException Error(string message) => new($"{message} (pozycja {_position + 1}).");
     }
 }
