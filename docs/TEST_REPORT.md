@@ -19,8 +19,8 @@ Testy obejmują priorytety, nawiasy, obie notacje dziesiętne, wartości ujemne,
 Ostatnie wykonanie `dotnet test QuickCalc.sln -c Release --no-restore`:
 
 - `QuickCalc.Core.Tests`: 183 zaliczone, 0 niezaliczonych, 0 pominiętych;
-- `QuickCalc.Integration.Tests`: 34 zaliczone, 0 niezaliczonych, 1 pominięty;
-- łącznie: 218 przypadków, z czego 217 zaliczonych i 1 pominięty.
+- `QuickCalc.Integration.Tests`: 36 zaliczone, 0 niezaliczonych, 1 pominięty;
+- łącznie: 220 przypadków, z czego 219 zaliczonych i 1 pominięty.
 
 Testy klawiaturowego `Ctrl+C` i awaryjnego `Ctrl+V` wymagają wyłącznego prawa do okna pierwszoplanowego. W ostatnim pełnym przebiegu runner nie przyznał go testowi kopiowania, dlatego został oznaczony jako pominięty zamiast fałszywie pozytywnego. Test wklejenia i ponownego zaznaczenia przeszedł; oba przepływy mają także niezależne testy polityki i schowka.
 

@@ -13,6 +13,7 @@ internal sealed class QuickCalcContext : ApplicationContext
     private readonly ExpressionHistory _history = new();
     private readonly NotifyIcon _tray;
     private readonly ToolStripMenuItem _closeOnFocusLossItem;
+    private readonly ToolStripMenuItem _autostartItem;
     private readonly System.Windows.Forms.Timer _popupGuard = new() { Interval = 750 };
     private readonly List<string> _diagnosticLog = [];
     private readonly Dictionary<int, string> _hotkeyStatus = [];
@@ -29,11 +30,15 @@ internal sealed class QuickCalcContext : ApplicationContext
         _closeOnFocusLossItem = new ToolStripMenuItem("Zamykaj popup po utracie fokusu") { CheckOnClick = true };
         _closeOnFocusLossItem.CheckedChanged += (_, _) => SetCloseOnFocusLoss(_closeOnFocusLossItem.Checked);
         menu.Items.Add(_closeOnFocusLossItem);
+        _autostartItem = new ToolStripMenuItem("Uruchamiaj przy starcie Windows");
+        _autostartItem.Click += (_, _) => ToggleAutostart();
+        menu.Items.Add(_autostartItem);
+        menu.Opening += (_, _) => RefreshAutostartItem();
         menu.Items.Add("Resetuj popupy", null, (_, _) => ResetPopups());
         menu.Items.Add("Wyczyść historię", null, (_, _) => _history.Clear());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Zakończ", null, (_, _) => ExitThread());
-        _tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "QuickCalc — F16: kontekst, Ctrl+F16: schowek", ContextMenuStrip = menu, Visible = true };
+        _tray = new NotifyIcon { Icon = AppIcon.Load(SystemInformation.SmallIconSize), Text = "QuickCalc — F16: kontekst, Ctrl+F16: schowek", ContextMenuStrip = menu, Visible = true };
         _tray.DoubleClick += (_, _) => Open(CalculatorMode.Clipboard);
         _popupGuard.Tick += (_, _) =>
         {
@@ -232,6 +237,49 @@ internal sealed class QuickCalcContext : ApplicationContext
         AddDiagnostic($"Zamykanie popupu po utracie fokusu: {(enabled ? "włączone" : "wyłączone")}.");
     }
 
+    private void RefreshAutostartItem()
+    {
+        try
+        {
+            var target = AutostartShortcut.ReadTarget();
+            var thisCopy = AutostartShortcut.PointsToThisExecutable();
+            _autostartItem.Checked = thisCopy;
+            _autostartItem.Text = target is not null && !thisCopy
+                ? "Uruchamiaj przy starcie Windows (teraz: inna kopia)"
+                : "Uruchamiaj przy starcie Windows";
+            _autostartItem.ToolTipText = target is null ? null : "Skrót wskazuje na: " + target;
+        }
+        catch (Exception ex)
+        {
+            AddDiagnostic("Nie udało się odczytać skrótu autostartu: " + ex.Message);
+        }
+    }
+
+    // Zaznaczenie zawsze ustawia autostart na TĘ kopię programu (np. nową wersję w innym folderze),
+    // zastępując skrót wskazujący starszą kopię.
+    private void ToggleAutostart()
+    {
+        try
+        {
+            if (AutostartShortcut.PointsToThisExecutable())
+            {
+                AutostartShortcut.Disable();
+                AddDiagnostic("Usunięto QuickCalc z autostartu.");
+            }
+            else
+            {
+                AutostartShortcut.Enable();
+                AddDiagnostic($"Autostart ustawiony na: {Environment.ProcessPath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            AddDiagnostic("Błąd zmiany autostartu: " + ex);
+            _tray.ShowBalloonTip(8000, "QuickCalc — autostart", ex.Message, ToolTipIcon.Error);
+        }
+        RefreshAutostartItem();
+    }
+
     private string BuildDiagnosticReport()
     {
         var process = Process.GetCurrentProcess();
@@ -305,7 +353,7 @@ internal sealed class QuickCalcContext : ApplicationContext
     protected override void ExitThreadCore()
     {
         _popupGuard.Stop(); _popupGuard.Dispose(); ResetPopups(); _diagnostics?.Close(); _hotkeys.Dispose();
-        _tray.Visible = false; _tray.Dispose(); base.ExitThreadCore();
+        _tray.Visible = false; _tray.Icon?.Dispose(); _tray.Dispose(); base.ExitThreadCore();
     }
 }
 

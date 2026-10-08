@@ -63,6 +63,21 @@ try {
     }
     Set-Content -LiteralPath $versionFile -Value $release.tag_name -Encoding ASCII
 
+    # Starsze wersje tworzyly skrot autostartu do Start-QuickCalc.cmd; przepinamy go na EXE.
+    $startupLink = Join-Path ([Environment]::GetFolderPath('Startup')) 'QuickCalc.lnk'
+    if (Test-Path -LiteralPath $startupLink) {
+        $wsh = New-Object -ComObject WScript.Shell
+        $shortcut = $wsh.CreateShortcut($startupLink)
+        $linkDirectory = if ($shortcut.TargetPath) { Split-Path -Parent $shortcut.TargetPath } else { '' }
+        if ($linkDirectory -and ($linkDirectory.TrimEnd('\') -ieq $installDirectory.TrimEnd('\'))) {
+            $shortcut.TargetPath = $exePath
+            $shortcut.WorkingDirectory = $installDirectory
+            $shortcut.IconLocation = $exePath
+            $shortcut.Save()
+            Write-Host 'Odswiezono skrot autostartu.'
+        }
+    }
+
     Write-Host "Zaktualizowano do $($release.tag_name). Uruchamiam QuickCalc..."
     if (-not $NoLaunch) { Start-Process -FilePath $exePath -WorkingDirectory $installDirectory }
     Pause-AndExit 0

@@ -13,10 +13,12 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>QuickCalc.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <None Update="hotkeys.json"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
+    <EmbeddedResource Include="QuickCalc.ico" LogicalName="QuickCalc.App.QuickCalc.ico" />
   </ItemGroup>
 
 </Project>

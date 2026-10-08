@@ -18,6 +18,7 @@ static class Program
                 if (new ExpressionEvaluator().Evaluate("*1", "5ft", true).Text != "1.524m") return 5;
                 if (new ExpressionEvaluator().Evaluate("!", "0b11110000").Text != "0b00001111") return 6;
                 if (new ExpressionEvaluator().Evaluate("u2()", "0b1000").Text != "-8") return 7;
+                using (var icon = AppIcon.Load(new Size(16, 16))) if (icon.Width != 16) return 8;
                 return 0;
             }
             catch (Exception ex)

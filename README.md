@@ -17,7 +17,16 @@ Jeśli Windows SmartScreen pokaże ostrzeżenie „Nieznany wydawca”, wybierz 
 
 W folderze QuickCalc kliknij dwukrotnie **`Update-QuickCalc.cmd`**. Skrypt sprawdzi najnowszą wersję na GitHubie, zamknie QuickCalc, podmieni pliki i uruchomi program ponownie. Twoje skróty i ustawienia (`hotkeys.json`) zostają zachowane, autostartu nie trzeba instalować ponownie.
 
-Wersja `v1.0.0` nie ma jeszcze tego skryptu. Żeby ją zaktualizować pierwszy raz: zakończ QuickCalc (prawy klik na ikonie → **Zakończ**), pobierz ZIP z linku powyżej i rozpakuj go do tego samego folderu, zastępując pliki. Od tej pory wystarczy `Update-QuickCalc.cmd`.
+Wersje starsze niż `v1.1.0` nie mają jeszcze tego skryptu. Żeby je zaktualizować pierwszy raz: zakończ QuickCalc (prawy klik na ikonie → **Zakończ**), pobierz ZIP z linku powyżej i rozpakuj go do tego samego folderu, zastępując pliki. Od tej pory wystarczy `Update-QuickCalc.cmd`.
+
+### Autostart po aktualizacji
+
+W autostarcie jest zawsze jeden skrót `QuickCalc.lnk`, który wskazuje na konkretny folder.
+
+- **Nowa wersja w tym samym folderze** (`Update-QuickCalc.cmd` albo rozpakowanie na stare pliki) — nic nie trzeba robić, skrót dalej działa.
+- **Nowa wersja w innym folderze** — uruchom nową kopię, kliknij prawym przyciskiem ikonę w zasobniku i zaznacz **Uruchamiaj przy starcie Windows**. Skrót zostanie przepięty na nową kopię (jeśli wskazywał na starą, opcja ma dopisek „teraz: inna kopia”). Potem stary folder możesz usunąć. To samo robi ponowne uruchomienie `Install-QuickCalc-Autostart.cmd` z nowego folderu.
+
+Żeby pokazać ikonę na stałe obok zegara zamiast w ukrytych ikonach, przeciągnij ją z rozwijanej listy na pasek zadań (albo: Ustawienia → Personalizacja → Pasek zadań → Inne ikony zasobnika → QuickCalc).
 
 ## Używanie
 
@@ -34,6 +43,7 @@ Menu ikony w zasobniku (prawy klik):
 
 - **Diagnostyka…** — zmiana skrótów (kliknij pole i naciśnij nową kombinację), stan rejestracji skrótów, dziennik.
 - **Zamykaj popup po utracie fokusu** — kliknięcie innego okna anuluje kalkulator. Zalecane.
+- **Uruchamiaj przy starcie Windows** — dodaje/usuwa tę kopię QuickCalc z autostartu.
 - **Resetuj popupy** — awaryjnie zamyka wszystkie okna kalkulatora.
 - **Zakończ** — wyłącza QuickCalc.
 
@@ -77,6 +87,8 @@ dotnet build QuickCalc.sln -c Debug
 dotnet test QuickCalc.sln -c Release
 .\Create-QuickCalc-Release.ps1      # paczka portable w artifacts\release
 ```
+
+Ikonę (`src\QuickCalc.App\QuickCalc.ico`) generuje `tools\New-QuickCalcIcon.ps1`.
 
 `Start-QuickCalc.cmd` i `Install-QuickCalc-Autostart.cmd` w katalogu głównym repozytorium uruchamiają lokalną publikację z `artifacts\publish` (tworzy ją `Publish-QuickCalc.ps1`). Pliki dla użytkownika końcowego leżą w `packaging\portable`.
 

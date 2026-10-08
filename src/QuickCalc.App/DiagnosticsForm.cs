@@ -19,6 +19,7 @@ internal sealed class DiagnosticsForm : Form
         _applySettings = applySettings;
         _openCalculator = openCalculator;
         Text = "QuickCalc — diagnostyka";
+        Icon = AppIcon.Load(SystemInformation.IconSize);
         ClientSize = new Size(820, 540);
         MinimumSize = new Size(650, 400);
         StartPosition = FormStartPosition.CenterScreen;
