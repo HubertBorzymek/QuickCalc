@@ -161,6 +161,44 @@ public sealed class CalculatorPopupTests
         Assert.IsFalse(completed.RestoreFocus);
     }
 
+    [TestMethod]
+    public void FocusLossGuardClosesPopupThatNeverBecameForeground()
+    {
+        Exception? failure = null;
+        using var done = new ManualResetEventSlim();
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var popup = new CalculatorPopup(CalculatorMode.Clipboard,
+                    new TargetContext(IntPtr.Zero, IntPtr.Zero, null, null, null, "test"),
+                    new ExpressionEvaluator(), new ExpressionHistory());
+                PopupOperation? completed = null;
+                popup.OperationFinished += (_, operation) => completed = operation;
+                popup.Show();
+                Application.DoEvents();
+
+                popup.CloseIfInactive(popup.Handle, TimeSpan.Zero);
+                Assert.IsNull(completed, "Foreground popup must stay open.");
+                popup.CloseIfInactive(IntPtr.Zero, TimeSpan.Zero);
+                Assert.IsNull(completed, "Guard must respect the disabled option.");
+
+                popup.CloseOnFocusLoss = true;
+                popup.CloseIfInactive(IntPtr.Zero, TimeSpan.FromMinutes(1));
+                Assert.IsNull(completed, "Guard must wait for the grace period.");
+                popup.CloseIfInactive(IntPtr.Zero, TimeSpan.Zero);
+                Assert.IsNotNull(completed);
+                Assert.IsTrue(completed.Cancelled);
+                Assert.IsFalse(completed.RestoreFocus);
+            }
+            catch (Exception ex) { failure = ex; }
+            finally { done.Set(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA); thread.Start();
+        Assert.IsTrue(done.Wait(TimeSpan.FromSeconds(10)));
+        if (failure is not null) throw failure;
+    }
+
     [STATestMethod]
     public void EscapeCancelsWithoutReturningAResult()
     {

@@ -4,14 +4,20 @@ QUICKCALC PORTABLE — WINDOWS 10/11 x64
 Ten folder zawiera kompletna, samowystarczalna aplikacje.
 Nie trzeba instalowac .NET ani Visual Studio.
 
-URUCHAMIANIE
-1. Skopiuj lub rozpakuj CALY folder w stale miejsce, np. Dokumenty\QuickCalc.
-2. Kliknij dwukrotnie Start-QuickCalc.cmd.
-3. Ikona QuickCalc pojawi sie w zasobniku systemowym.
+PIERWSZE URUCHOMIENIE
+1. Rozpakuj CALY folder w stale miejsce, np. Dokumenty\QuickCalc.
+2. Uruchom Install-QuickCalc-Autostart.cmd (QuickCalc wystartuje przy kazdym logowaniu).
+3. Kliknij dwukrotnie Start-QuickCalc.cmd, aby uruchomic go od razu.
+4. Ikona QuickCalc pojawi sie w zasobniku systemowym (obok zegara).
+
+AKTUALIZACJA
+- Uruchom Update-QuickCalc.cmd. Skrypt pobierze najnowsza wersje z GitHub,
+  zamknie QuickCalc, podmieni pliki i uruchomi go ponownie.
+- Twoje ustawienia (hotkeys.json) zostaja zachowane.
 
 AUTOSTART
-- Uruchom Install-QuickCalc-Autostart.cmd.
-- Aby usunac skrot, uruchom Remove-QuickCalc-Autostart.cmd.
+- Install-QuickCalc-Autostart.cmd dodaje skrot do autostartu.
+- Remove-QuickCalc-Autostart.cmd usuwa skrot.
 - Po przeniesieniu folderu ponownie uruchom instalator autostartu.
 
 SKROTY DOMYSLNE

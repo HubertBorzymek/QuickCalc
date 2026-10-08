@@ -24,7 +24,7 @@ jobs:
 
       - name: Build portable package
         shell: pwsh
-        run: ./Create-QuickCalc-Release.ps1
+        run: ./Create-QuickCalc-Release.ps1 -Version '${{ github.ref_name }}'
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')

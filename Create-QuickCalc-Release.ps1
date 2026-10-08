@@ -1,3 +1,5 @@
+﻿param([string]$Version)
+
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -36,7 +38,14 @@ if ($LASTEXITCODE -ne 0) {
 Copy-Item -LiteralPath (Join-Path $templateDirectory 'Start-QuickCalc.cmd') -Destination $packageDirectory
 Copy-Item -LiteralPath (Join-Path $templateDirectory 'Install-QuickCalc-Autostart.cmd') -Destination $packageDirectory
 Copy-Item -LiteralPath (Join-Path $templateDirectory 'Remove-QuickCalc-Autostart.cmd') -Destination $packageDirectory
+Copy-Item -LiteralPath (Join-Path $templateDirectory 'Update-QuickCalc.cmd') -Destination $packageDirectory
+Copy-Item -LiteralPath (Join-Path $templateDirectory 'Update-QuickCalc.ps1') -Destination $packageDirectory
 Copy-Item -LiteralPath (Join-Path $templateDirectory 'README.txt') -Destination $packageDirectory
+if (-not $Version) {
+    $Version = (git -C $root describe --tags --always 2>$null)
+    if (-not $Version) { $Version = 'dev' }
+}
+Set-Content -LiteralPath (Join-Path $packageDirectory 'VERSION.txt') -Value $Version -Encoding ASCII
 
 $publishedExe = Join-Path $packageDirectory 'QuickCalc.App.exe'
 $selfTest = Start-Process -FilePath $publishedExe -ArgumentList '--self-test' `

@@ -49,6 +49,7 @@ internal sealed class CalculatorPopup : Form
     private bool _completionRaised;
     private bool _expanded;
     private bool _closeOnFocusLoss;
+    private long _shownAt;
 
     public event EventHandler<PopupOperation>? OperationFinished;
     internal bool IsExpanded => _expanded;
@@ -152,6 +153,7 @@ internal sealed class CalculatorPopup : Form
         _expression.KeyDown += ExpressionKeyDown;
         Shown += (_, _) =>
         {
+            _shownAt = Environment.TickCount64;
             ApplyLayout();
             MoveToPreferredLocation();
             FocusExpression();
@@ -292,6 +294,16 @@ internal sealed class CalculatorPopup : Form
         if (_closeOnFocusLoss && !_completionRaised) Finish(new(_mode, true, RestoreFocus: false));
     }
 
+    // Deactivate never fires for a popup that Windows refused to bring to the foreground,
+    // so the tray guard also polls the real foreground window.
+    internal void CloseIfInactive(IntPtr foregroundWindow, TimeSpan grace)
+    {
+        if (!_closeOnFocusLoss || _completionRaised || !Visible || IsDisposed) return;
+        if (Environment.TickCount64 - _shownAt < grace.TotalMilliseconds) return;
+        if (foregroundWindow == Handle) return;
+        HandleFocusLoss();
+    }
+
     private void NavigateHistory(string? value)
     {
         if (value is null) return;
@@ -333,6 +345,7 @@ internal sealed class CalculatorPopup : Form
     public void ShowOperationError(string message)
     {
         _completionRaised = false;
+        _shownAt = Environment.TickCount64;
         SetError(message);
         Show();
         Activate();
@@ -514,6 +527,9 @@ internal sealed class CalculatorPopup : Form
 
     private static string Shorten(string value, int maxLength) =>
         value.Length <= maxLength ? value : value[..(maxLength - 1)] + "…";
+
+    [DllImport("user32.dll")]
+    internal static extern IntPtr GetForegroundWindow();
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);

@@ -35,7 +35,11 @@ internal sealed class QuickCalcContext : ApplicationContext
         menu.Items.Add("Zakończ", null, (_, _) => ExitThread());
         _tray = new NotifyIcon { Icon = SystemIcons.Application, Text = "QuickCalc — F16: kontekst, Ctrl+F16: schowek", ContextMenuStrip = menu, Visible = true };
         _tray.DoubleClick += (_, _) => Open(CalculatorMode.Clipboard);
-        _popupGuard.Tick += (_, _) => EnsureSinglePopup();
+        _popupGuard.Tick += (_, _) =>
+        {
+            EnsureSinglePopup();
+            _popup?.CloseIfInactive(CalculatorPopup.GetForegroundWindow(), TimeSpan.FromSeconds(1.5));
+        };
         _popupGuard.Start();
         _hotkeys.Pressed += (_, id) =>
         {

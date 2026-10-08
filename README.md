@@ -1,102 +1,92 @@
 # QuickCalc
 
-QuickCalc to lokalny kalkulator kontekstowy dla Windows. Działa w tle, otwiera małe okno nad bieżącą aplikacją i potrafi zastąpić dokładnie zaznaczony fragment albo wstawić wynik w pozycji kursora. Projekt jest przygotowany dla Visual Studio 2026 i .NET 9.
+Kalkulator działający w tle na Windows 10/11. Naciskasz skrót, wpisujesz działanie, a wynik trafia prosto do pola, w którym pracujesz (albo do schowka).
 
-## Dlaczego C#
+## Instalacja na nowym komputerze
 
-Wybrano C# z Windows Forms. W porównaniu z natywnym C++ daje prostsze testowanie i utrzymanie, a wymagane operacje Win32, UI Automation oraz globalne skróty są dostępne przez P/Invoke i COM. AutoHotkey nie usuwa trudności związanych z wykrywaniem prawdziwego zaznaczenia, przywracaniem fokusu ani bezpieczeństwem schowka, dlatego nie jest zależnością aplikacji.
+Nie potrzebujesz Visual Studio, .NET ani klonowania repozytorium.
 
-## Uruchamianie
+1. Pobierz **[QuickCalc-portable-win-x64.zip](https://github.com/HubertBorzymek/QuickCalc/releases/latest/download/QuickCalc-portable-win-x64.zip)** (zawsze najnowsza wersja; lista wszystkich wersji jest w zakładce [Releases](https://github.com/HubertBorzymek/QuickCalc/releases)).
+2. Rozpakuj ZIP w stałe miejsce, np. `Dokumenty\QuickCalc`. Nie uruchamiaj programu z wnętrza ZIP-a ani z folderu Pobrane, który potem wyczyścisz.
+3. W rozpakowanym folderze kliknij dwukrotnie **`Install-QuickCalc-Autostart.cmd`** — QuickCalc będzie startował przy każdym logowaniu.
+4. Kliknij dwukrotnie **`Start-QuickCalc.cmd`**, żeby uruchomić go od razu. Ikona pojawi się w zasobniku obok zegara.
 
-Najprościej dwukrotnie kliknąć `Start-QuickCalc.cmd`. Plik uruchamia gotową aplikację z `artifacts\publish`, niezależnie od bieżącego katalogu roboczego. Po starcie ikona QuickCalc jest widoczna w zasobniku systemowym. Deweloperski `Start-QuickCalc.ps1` dodatkowo potrafi uruchomić projekt przez `dotnet run`, gdy publikacja jeszcze nie istnieje.
+Jeśli Windows SmartScreen pokaże ostrzeżenie „Nieznany wydawca”, wybierz **Więcej informacji → Uruchom mimo to** (aplikacja nie jest podpisana certyfikatem).
 
-Aby uruchamiać QuickCalc przy logowaniu do Windows, dwukrotnie kliknij `Install-QuickCalc-Autostart.cmd`. Tworzy on skrót `QuickCalc.lnk` w folderze Autostart bieżącego użytkownika; skrót wskazuje na `Start-QuickCalc.cmd`, więc przenoszenie samego pliku do folderu Autostart nie jest potrzebne.
+## Aktualizacja
 
-### Przenoszenie na inny komputer
+W folderze QuickCalc kliknij dwukrotnie **`Update-QuickCalc.cmd`**. Skrypt sprawdzi najnowszą wersję na GitHubie, zamknie QuickCalc, podmieni pliki i uruchomi program ponownie. Twoje skróty i ustawienia (`hotkeys.json`) zostają zachowane, autostartu nie trzeba instalować ponownie.
 
-Uruchom `Create-QuickCalc-Release.ps1`. Skrypt tworzy gotowy folder `artifacts\release\QuickCalc-portable-win-x64` oraz odpowiadający mu plik ZIP. Pakiet jest samowystarczalny dla Windows 10/11 x64 i nie wymaga instalowania .NET ani Visual Studio. Na drugi komputer należy przenieść cały folder lub ZIP, rozpakować go w stałym miejscu i dwukrotnie kliknąć znajdujący się wewnątrz `Start-QuickCalc.cmd`. Do pakietu dołączone są osobne skrypty dodawania i usuwania autostartu.
+Wersja `v1.0.0` nie ma jeszcze tego skryptu. Żeby ją zaktualizować pierwszy raz: zakończ QuickCalc (prawy klik na ikonie → **Zakończ**), pobierz ZIP z linku powyżej i rozpakuj go do tego samego folderu, zastępując pliki. Od tej pory wystarczy `Update-QuickCalc.cmd`.
 
-Gotowy ZIP jest też publikowany w zakładce [Releases](https://github.com/HubertBorzymek/QuickCalc/releases) — na innym komputerze wystarczy pobrać `QuickCalc-portable-win-x64.zip` z najnowszego wydania, bez klonowania repozytorium. Nowe wydanie tworzy GitHub Actions (`.github/workflows/release.yml`) po wypchnięciu taga wersji:
+## Używanie
 
-```
-git tag v1.1.0
-git push origin v1.1.0
-```
+| Klawisz | Działanie |
+|---|---|
+| `F16` | Kalkulator kontekstowy — wynik zastępuje zaznaczenie albo trafia w miejsce kursora. Ponowne `F16` przełącza widok Compact ↔ Expanded. |
+| `Ctrl+F16` | Kalkulator schowka — wynik jest kopiowany, nic nie jest wklejane. |
+| `Enter` | Zastosuj wynik, zachowując jednostkę. |
+| `Shift+Enter` | Zastosuj wynik w czytelnej jednostce SI (np. `0.0000047 F` → `4.7 µF`). |
+| `Esc` | Anuluj bez zmiany pola i schowka. |
+| `↑` / `↓` | Historia wyrażeń. |
 
-W Visual Studio 2026:
+Menu ikony w zasobniku (prawy klik):
 
-1. Otwórz `QuickCalc.sln`.
-2. Wybierz profil uruchamiania `QuickCalc` lub ustaw `QuickCalc.App` jako projekt startowy.
-3. Naciśnij F5.
+- **Diagnostyka…** — zmiana skrótów (kliknij pole i naciśnij nową kombinację), stan rejestracji skrótów, dziennik.
+- **Zamykaj popup po utracie fokusu** — kliknięcie innego okna anuluje kalkulator. Zalecane.
+- **Resetuj popupy** — awaryjnie zamyka wszystkie okna kalkulatora.
+- **Zakończ** — wyłącza QuickCalc.
 
-Domyślne skróty:
+Ustawienia są zapisywane w `hotkeys.json` obok programu.
 
-- `F16` — kalkulator kontekstowy; wynik zastępuje zaznaczenie lub trafia w pozycję kursora.
-- `Ctrl+F16` — kalkulator schowka; wynik zostaje skopiowany, ale nie jest wklejany.
-- `Enter` — zatwierdzenie z zachowaniem jednostki wejściowej.
-- `Shift+Enter` — zatwierdzenie z konwersją do czytelnej jednostki SI.
-- `Escape` — anulowanie bez zmiany tekstu i schowka.
+## Wyrażenia
 
-Program kończy się przez polecenie **Zakończ** w menu ikony zasobnika. Opcja **Zamykaj popup po utracie fokusu** automatycznie anuluje i zamyka kalkulator po kliknięciu innego okna, bez odbierania mu fokusu; ustawienie jest zapamiętywane. **Resetuj popupy** awaryjnie zamyka wszystkie okna kalkulatora. Niezależny strażnik okresowo wykrywa duplikaty i pozostawia tylko jeden popup. Program nie rejestruje autostartu.
+| Zapis | Znaczenie | Przykład |
+|---|---|---|
+| `+ - * /`, nawiasy | podstawowe działania | `(2+3)*4` |
+| `p` | potęga | `2p8` = `256` |
+| `r`, `√` | pierwiastek kwadratowy | `r81` = `9` |
+| `ln`, `log` | logarytm naturalny / dziesiętny | `log1000` = `3` |
+| `abs` | wartość bezwzględna | `abs(-5)` |
+| `e`, `pi`, `π` | stałe | `2*pi` |
+| `x` | zaznaczona wartość | `(x+5)/2`, `1/x` |
+| `+5`, `*2`, `r`, `log` … | działanie względne na zaznaczeniu | zaznaczone `25mm`, wpisz `+5` → `30mm` |
+| `\|\|` | połączenie równoległe `R1*R2/(R1+R2)` | zaznaczone `100Ω`, wpisz `\|\|100` → `50Ω` |
+| `& \| ^ ! << >>` | AND, OR, XOR, NOT, przesunięcia (tylko liczby całkowite) | `!0xF0` = `0x0F` |
+| `0x…`, `0b…` | literały HEX / BIN, można mieszać z DEC | `10+0x10` |
+| `hex`, `bin`, `dec` na końcu | wymuszenie formatu wyniku; samo słowo konwertuje zaznaczenie | `255 hex` = `0xFF` |
+| `u2` | wzorzec BIN/HEX w kodzie U2 → DEC | `u2(0b1000)` = `-8` |
 
-Popup domyślnie otwiera się jako ciemny, półprzezroczysty pasek **Compact** bez systemowego paska tytułu. Pokazuje zaznaczoną wartość, pole wyrażenia i wynik aktualizowany podczas pisania. Ponowne naciśnięcie `F16`, gdy popup jest otwarty, przełącza **Compact ↔ Expanded** bez kasowania wyrażenia ani utraty fokusu. Widok Expanded dodaje tryb pracy, zaznaczenie, wynik, historię, sterowanie oraz krótką ściągę mniej oczywistych operatorów. Zwykłe błędy są pokazywane wewnątrz popupu, bez MessageBoxów.
+Uwaga: `^` to XOR, a nie potęga — potęga to `p`.
 
-W trybie kontekstowym popup jest ustawiany lekko pod aktywnym polem tekstowym (lub nad nim, gdy pod spodem brakuje miejsca). Tryb schowka otwiera się przy kursorze myszy. Położenie i rozmiar są przeliczane dla bieżącego monitora i jego DPI, a popup pozostaje w obszarze roboczym. Tryb schowka nie uruchamia analizy zaznaczenia, a zapytanie UI Automation trybu kontekstowego ma twardy limit czasu, więc wadliwy dostawca edytora nie może blokować pojawienia się okna.
+Jednostki: przedrostki SI (`u` = `µ`) oraz `m`, `kg`, `s`, `A`, `K`, `mol`, `cd`, `V`, `Ω`/`ohm`, `F`, `H`, `Hz`, `W`, `N`, `Pa`, `J`, `C`, `S`, `Wb`, `T`, `in`/`inch`, `ft`, `yd`, `mi`, `mil`, `min`, `hr`. Spacja przed jednostką jest zachowywana (`10 mm/2` → `5 mm`). Odwrotność czasu i częstotliwości zmienia wymiar (`1/x` dla `2.5 kHz` → `400 µs`).
 
-### Diagnostyka skrótów
+## Ograniczenia
 
-Kliknij prawym przyciskiem ikonę QuickCalc w zasobniku i wybierz **Diagnostyka…**. Okno pokazuje osobny stan rejestracji obu skrótów, dokładny błąd Win32, numer sesji procesu oraz dziennik komunikatów `WM_HOTKEY`. Aby zmienić skrót, kliknij jego pole i naciśnij żądaną kombinację: dowolny klawisz bazowy z opcjonalnymi `Ctrl`, `Shift`, `Alt` i `Win`. Przycisk **Zastosuj skróty** rejestruje i zapisuje konfigurację. Jeśli kombinacja jest zarezerwowana przez Windows albo zajęta przez inny program, poprzednia konfiguracja zostanie przywrócona.
+- QuickCalc uruchomiony bez uprawnień administratora nie może wpisywać do programów uruchomionych jako administrator.
+- W nietypowych edytorach (przeglądarki, VS Code, Altium) wynik jest wstawiany przez chwilowe użycie schowka; poprzednia zawartość schowka jest przywracana.
+- Niektóre aplikacje przestają podświetlać zaznaczenie, gdy popup przejmie fokus — zaznaczenie nadal istnieje.
+- Błędy interfejsu są zapisywane w `quickcalc-error.log` obok programu.
 
-Przycisk **Otwórz test kalkulatora** uruchamia kalkulator schowka bez skrótu. W oknie można również sprawdzić kod klawisza rzeczywiście wysyłany przez programowalną klawiaturę i skopiować raport.
+## Dla dewelopera
 
-Menu ikony zawiera również osobne polecenia otwierające oba tryby bez użycia skrótu.
-
-## Wyrażenia i jednostki
-
-Obsługiwane są `+`, `-`, `*`, `/`, potęgowanie `p`, nawiasy, znaki jednoargumentowe, kropka i przecinek dziesiętny. Pierwiastek kwadratowy zapisuje się jako `r`, np. `r81`, `rx` albo `r(9+7)`; akceptowany jest również znak `√`. Logarytm naturalny zapisuje się jako `ln`, a dziesiętny jako `log`, np. `lnx`, `ln(e)`, `log1000` albo `log(100)`. Dostępne są stałe `e`, `pi` i `π`.
-
-Litera `x` oznacza zaznaczoną wartość, dlatego działają pełne wyrażenia, np. `-x`, `1/x`, `xp2` i `(x+5)/2`. Zachowane są skróty względne: `+5`, `-5`, `*2`, `/2`, samo `r`, `ln` i `log`. Bez zaznaczenia użycie `x` albo skrótu względnego powoduje czytelny błąd. Potęgowanie zapisuje się przez `p`, np. `2p8 = 256`; znak `^` oznacza teraz XOR.
-
-Dostępne są operatory całkowitoliczbowe `&`, `|`, `^`, `!`, `<<` i `>>`. Dla BIN/HEX operator `!` odwraca bity w szerokości zapisu i pozostawia wynik dodatni, np. `!0b11110000 = 0b00001111`, `!0xF0 = 0x0F`. Funkcja `u2` interpretuje wzorzec BIN/HEX jako liczbę w kodzie uzupełnień do dwóch i zwraca DEC: `u2(0b1000) = -8`, `u2(0b1111) = -1`; samo `u2` lub `u2()` działa na zaznaczeniu. Operatory bitowe nie przyjmują liczb zmiennoprzecinkowych ani wartości z jednostką. Literały dziesiętne, szesnastkowe i binarne można mieszać, np. `10+0x10` i `0b1000+0x10`. Wynik dziedziczy format zaznaczenia, a bez zaznaczenia — pierwszego literału; wynik niecałkowity jest zawsze dziesiętny. Format całego wyniku można wymusić końcowym `h`/`hex`, `b`/`bin` albo `d`/`dec`, ze spacją lub bez. Wpisanie samego `hex`, `bin` albo `dec` konwertuje zaznaczoną liczbę bez zmiany wartości. Pełny literał HEX ma pierwszeństwo, więc `0xABCD` pozostaje liczbą, natomiast `0xABCD d` wymusza DEC.
-
-Funkcja `abs` zwraca wartość bezwzględną (`abs(-5)`, `abs(x)` lub samo `abs` dla zaznaczenia). Operator `||` oblicza połączenie równoległe: `R1*R2/(R1+R2)`. Działa dla dwóch skalarów lub rezystancji, również skrótowo, np. zaznaczone `100Ω` i `||100` daje `50Ω`.
-
-Parser obsługuje jednostki bazowe SI i ich przedrostki (m.in. `m`, `kg`, `s`, `A`, `K`, `mol`, `cd`) oraz jednostki używane w elektronice i technice: `V`, `Ω`/`ohm`, `F`, `H`, `Hz`, `W`, `N`, `Pa`, `J`, `C`, `S`, `Wb`, `T`. Dostępne są również `in`/`inch`, `ft`, `yd`, `mi`, `mil`, `min` i `hr`/`hour`/`hours`. Przedrostek `u` jest przyjmowany jako łatwy do wpisania odpowiednik `µ`. Samo `h` jest zarezerwowane jako suffix wyniku HEX.
-
-Spacja przed jednostką jest zachowywana: `10mm/2` daje `5mm`, natomiast `10 mm/2` daje `5 mm`. `Enter` zachowuje jednostkę wejściową, a `Shift+Enter` dobiera czytelną jednostkę SI. Przy pustym polu `Shift+Enter` konwertuje samo zaznaczenie, np. `0.0000047 F` na `4.7 µF`; bez zaznaczenia niczego nie zmienia. Odwrotność częstotliwości lub czasu zmienia wymiar, dlatego `2.5 kHz`, `1/x` i `Shift+Enter` daje `400 µs`.
-
-Przykłady względne: zaznaczone `25mm` i `+5` daje `30mm`; zaznaczone `81` i `r*2+1` daje `19`; zaznaczone `100` i `log*3` daje `6`. Potęgowanie, pierwiastkowanie i logarytmy wielkości z jednostkami pozostają odrzucane, z wyjątkiem obsługiwanej odwrotności czasu i częstotliwości.
-
-## Zmiana skrótów
-
-Najwygodniej użyć pól przechwytujących kombinację w oknie **Diagnostyka**. Konfiguracja jest zapisywana w `hotkeys.json` obok pliku wykonywalnego; ten sam plik przechowuje wybór zamykania popupu po utracie fokusu, więc oba ustawienia pozostają aktywne po ponownym uruchomieniu.
-
-## Budowanie, testy i publikacja
+Wymagany .NET 9 SDK (Visual Studio 2026: otwórz `QuickCalc.sln`, projekt startowy `QuickCalc.App`, F5).
 
 ```powershell
 dotnet build QuickCalc.sln -c Debug
 dotnet test QuickCalc.sln -c Release
-.\Publish-QuickCalc.ps1
+.\Create-QuickCalc-Release.ps1      # paczka portable w artifacts\release
 ```
 
-Publikacja samowystarczalna dla Windows x64 trafia do `artifacts/publish`. Nie jest pojedynczym plikiem, aby nie komplikować ładowania bibliotek automatyzacji Windows. Do usunięcia programu wystarczy zakończyć go i skasować katalog projektu lub publikacji.
+`Start-QuickCalc.cmd` i `Install-QuickCalc-Autostart.cmd` w katalogu głównym repozytorium uruchamiają lokalną publikację z `artifacts\publish` (tworzy ją `Publish-QuickCalc.ps1`). Pliki dla użytkownika końcowego leżą w `packaging\portable`.
 
-`tests/QuickCalc.TestHost` jest aplikacją z typowymi polami tekstowymi do ręcznych testów zaznaczenia, kursora, tekstu wielowierszowego i jednostek.
+### Wydawanie nowej wersji
 
-## Bezpieczeństwo i ograniczenia
+Wypchnięcie taga `v*` uruchamia GitHub Actions ([`release.yml`](.github/workflows/release.yml)): testy, budowa paczki portable i publikacja w Releases. Od tej chwili `Update-QuickCalc.cmd` na innych komputerach pobierze nową wersję.
 
-Standardowe kontrolki Edit/RichEdit są obsługiwane bezpośrednio przez `EM_GETSEL`, `EM_SETSEL` i `EM_REPLACESEL`. Dla innych kontrolek aplikacja najpierw korzysta z UI Automation TextPattern i bezpośredniego `WM_COPY`, a ostatecznie z chwilowego klawiaturowego `Ctrl+C`. Klawiaturowy fallback jest pomijany wyłącznie dla procesu Visual Studio (`devenv`) bez potwierdzonego zakresu, ponieważ tam `Ctrl+C` bez zaznaczenia może uruchomić blokujące polecenie edytora. Wynik jest wstawiany jak przez `Ctrl+V`; wcześniejsza zawartość i formaty schowka są odtwarzane po operacji.
+```powershell
+git tag v1.1.0
+git push origin v1.1.0
+```
 
-W przeglądarkach, VS Code i aplikacjach Electron UI Automation jest tylko pomocą, a nie warunkiem wstawienia. QuickCalc nie próbuje ponownie aktywować zapamiętanego zaznaczonego zakresu UI Automation po zmianie fokusu, ponieważ niektóre przeglądarki unieważniają taki zakres i mogłyby zmienić zawartość pola. Może natomiast przywrócić pusty zakres kursora, aby kontrolka wybierająca całą zawartość po odzyskaniu fokusu nie nadpisała starego tekstu. Następnie wysyłane jest standardowe `Ctrl+V`. Jeśli wcześniej istniało zaznaczenie, cały wklejony wynik zostaje ponownie zaznaczony; bez zaznaczenia kursor pozostaje za wynikiem. Nieobsłużone wyjątki interfejsu są zapisywane w `quickcalc-error.log` obok programu.
-
-Tryb kontekstowy korzysta ze schowka wyłącznie tymczasowo i przywraca jego wcześniejszą zawartość. Tryb schowka celowo zastępuje jego zawartość. Aplikacja uruchomiona bez podniesionych uprawnień nie może niezawodnie sterować oknem uruchomionym jako administrator. Po otwarciu popupu niektóre aplikacje przestają rysować kolor zaznaczenia, ponieważ tracą fokus; nie oznacza to usunięcia tekstu ani logicznego zakresu zaznaczenia.
-
-## Ręczny test Altium Designer 18
-
-1. Pracuj na kopii testowego projektu PCB.
-2. Otwórz kolejno pole X, Y, rozmiar pada i szerokość ścieżki.
-3. Zaznacz wyłącznie wartość z jednostką, naciśnij F16, wpisz `+5mil`, zatwierdź i sprawdź zmieniony fragment.
-4. Powtórz dla `mm`, `mil`, braku zaznaczenia, anulowania Escape i obu poziomów uprawnień.
-5. Sprawdź format po zatwierdzeniu pola przez Altium oraz brak zmiany schowka w trybie kontekstowym.
-
-Altium Designer nie jest wymagany do uruchomienia testów automatycznych.
+Struktura: `src/QuickCalc.Core` — parser i jednostki, `src/QuickCalc.Windows` — skróty globalne, zaznaczenie i wstawianie (Win32, UI Automation), `src/QuickCalc.App` — tray i popup, `tests/` — testy jednostkowe, integracyjne i `QuickCalc.TestHost` do ręcznych testów. Szczegóły testów: [docs/TEST_REPORT.md](docs/TEST_REPORT.md).
