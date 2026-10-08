@@ -16,6 +16,13 @@ Aby uruchamiać QuickCalc przy logowaniu do Windows, dwukrotnie kliknij `Install
 
 Uruchom `Create-QuickCalc-Release.ps1`. Skrypt tworzy gotowy folder `artifacts\release\QuickCalc-portable-win-x64` oraz odpowiadający mu plik ZIP. Pakiet jest samowystarczalny dla Windows 10/11 x64 i nie wymaga instalowania .NET ani Visual Studio. Na drugi komputer należy przenieść cały folder lub ZIP, rozpakować go w stałym miejscu i dwukrotnie kliknąć znajdujący się wewnątrz `Start-QuickCalc.cmd`. Do pakietu dołączone są osobne skrypty dodawania i usuwania autostartu.
 
+Gotowy ZIP jest też publikowany w zakładce [Releases](https://github.com/HubertBorzymek/QuickCalc/releases) — na innym komputerze wystarczy pobrać `QuickCalc-portable-win-x64.zip` z najnowszego wydania, bez klonowania repozytorium. Nowe wydanie tworzy GitHub Actions (`.github/workflows/release.yml`) po wypchnięciu taga wersji:
+
+```
+git tag v1.1.0
+git push origin v1.1.0
+```
+
 W Visual Studio 2026:
 
 1. Otwórz `QuickCalc.sln`.
